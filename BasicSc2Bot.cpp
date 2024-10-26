@@ -149,5 +149,3 @@ bool BasicSc2Bot::TryBuildZergling() {
     }
     return false;
 }
-
-for
