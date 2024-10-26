@@ -13,6 +13,16 @@ void BasicSc2Bot::OnStep() {
   TryBuildDrone();
   TryBuildHatchery();
   TrySpawnOverlord();
+
+    // start building zerglings if we have enough drones
+    if (CountUnitType(UNIT_TYPEID::ZERG_DRONE) >= 12) {
+        TryBuildZergling();
+    }
+
+    // trigger attack if we have enough zerglings
+    if (CountUnitType(UNIT_TYPEID::ZERG_ZERGLING) >= 20) {
+        AttackWithZerglings();
+    }
 }
 
 //  void BasicSc2Bot::OnUnitIdle(const Unit* unit) {
@@ -126,3 +136,18 @@ bool BasicSc2Bot::TryBuildDrone() {
         }
         return count;
     }
+
+// spawning zerglings for atttack
+bool BasicSc2Bot::TryBuildZergling() {
+    const ObservationInterface* observation = Observation();
+    if (observation->GetMinerals() >= 50) {
+        const Unit* larva = FindNearestLarva();
+        if (larva) {
+            Actions()->UnitCommand(larva, ABILITY_ID::TRAIN_ZERGLING);
+            return true;
+        }
+    }
+    return false;
+}
+
+for
