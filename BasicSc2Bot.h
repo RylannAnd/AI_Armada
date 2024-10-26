@@ -18,13 +18,17 @@ public:
 private:
     bool TryBuildDrone();
     bool TrySpawnOverlord();
-
     bool TryBuildHatchery();
+    bool TryBuildSpawningPool();
 
     const Unit* FindNearestLarva();
     const Unit* FindAvailableDrone();
 
     int CountUnitType(UNIT_TYPEID unit_type);
+
+    // Zergling Methods
+    bool TryBuildZergling();
+    void AttackWithZerglings();
 };
 
 
