@@ -20,15 +20,17 @@ private:
     bool TrySpawnOverlord();
     bool TryBuildHatchery();
     bool TryBuildSpawningPool();
+    bool TryBuildExtractor();
 
     const Unit* FindNearestLarva();
     const Unit* FindAvailableDrone();
 
     int CountUnitType(UNIT_TYPEID unit_type);
 
-    // Zergling Methods
     bool TryBuildZergling();
     void AttackWithZerglings();
+
+    const Unit* FindNearestVespeneGeyser(const Point2D& start);
 };
 
 
