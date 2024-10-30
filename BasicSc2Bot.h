@@ -26,9 +26,10 @@ private:
     const Unit* FindAvailableDrone();
 
     int CountUnitType(UNIT_TYPEID unit_type);
+    Point2D FindEnemyBase();
 
     bool TryBuildZergling();
-    void AttackWithZerglings();
+    void AttackWithZerglings(Point2D target);
 
     const Unit* FindNearestVespeneGeyser(const Point2D& start);
 };

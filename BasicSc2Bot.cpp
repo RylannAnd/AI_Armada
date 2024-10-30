@@ -12,8 +12,21 @@ void BasicSc2Bot::OnGameStart() { return; }
 void BasicSc2Bot::OnStep() {
 	const ObservationInterface *observation = Observation();
 
+    TryBuildZergling();
+
+    static bool rush = false;
+    // Find enemy base
+    static Point2D enemy_base =  Point2D(0, 0);
+    if (enemy_base == Point2D(0,0)) {
+        enemy_base = FindEnemyBase();
+    }
+    else if (CountUnitType(UNIT_TYPEID::ZERG_ZERGLING) >= 8) {
+        AttackWithZerglings(enemy_base);
+    }
+
 	static int overlord_count = 0;
-	if (observation->GetFoodUsed() >= 13 && overlord_count == 0 && observation->GetMinerals() >= 100) {
+    int required_overlords = (observation->GetFoodUsed() + 8) / 8;
+	if ((observation->GetFoodUsed() >= 13 && overlord_count == 0 && observation->GetMinerals() >= 100) || (overlord_count > 0 && overlord_count < required_overlords)) {
 		TrySpawnOverlord();
 		overlord_count++;
 	}
@@ -129,12 +142,12 @@ bool BasicSc2Bot::TryBuildExtractor() {
 // ==================================================================================================
 bool BasicSc2Bot::TryBuildZergling() {
 	const ObservationInterface *observation = Observation();
-	if (observation->GetMinerals() >= 50) {
-		const Unit *larva = FindNearestLarva();
-		if (larva) {
-			Actions()->UnitCommand(larva, ABILITY_ID::TRAIN_ZERGLING);
-			return true;
-		}
+    if (CountUnitType(UNIT_TYPEID::ZERG_SPAWNINGPOOL) && observation->GetMinerals() >= 50) {
+        const Unit *larva = FindNearestLarva();
+        if (larva) {
+            Actions()->UnitCommand(larva, ABILITY_ID::TRAIN_ZERGLING);
+            return true;
+        }
 	}
 	return false;
 }
@@ -230,3 +243,27 @@ const Unit *BasicSc2Bot::FindNearestVespeneGeyser(const Point2D &start) {
 
 // ATTACKING / SCOUTING
 // ======================================================================================================================
+
+void BasicSc2Bot::AttackWithZerglings(Point2D target) {
+    auto zerglings = Observation()->GetUnits([&](const Unit& unit) {
+            return unit.unit_type == UNIT_TYPEID::ZERG_ZERGLING && unit.alliance == Unit::Alliance::Self;
+    });
+
+    if (target != Point2D(0, 0)) {
+        for (const auto& zergling : zerglings) {
+            Actions()->UnitCommand(zergling, ABILITY_ID::ATTACK, target);
+        }
+    }
+}
+
+// For later scouting use
+Point2D BasicSc2Bot::FindEnemyBase() {
+    for (const auto& enemy_struct : Observation()->GetUnits(Unit::Alliance::Enemy)) {
+        if (enemy_struct->unit_type == UNIT_TYPEID::ZERG_HATCHERY || 
+            enemy_struct->unit_type == UNIT_TYPEID::PROTOSS_NEXUS || 
+            enemy_struct->unit_type == UNIT_TYPEID::TERRAN_COMMANDCENTER) {
+            return enemy_struct->pos;
+        }
+    }
+    return Point2D(0, 0);
+}
