@@ -6,13 +6,33 @@
 #include "sc2lib/sc2_lib.h"
 #include "sc2utils/sc2_manage_process.h"
 #include "sc2utils/sc2_arg_parser.h"
+#include <sc2api/sc2_unit_filters.h>
 
+using namespace sc2;
 class BasicSc2Bot : public sc2::Agent {
 public:
 	virtual void OnGameStart();
 	virtual void OnStep();
+    // virtual void OnUnitIdle(const Unit* unit);
 
 private:
+    bool TryBuildDrone();
+    bool TrySpawnOverlord();
+    bool TryBuildHatchery();
+    bool TryBuildSpawningPool();
+    bool TryBuildExtractor();
+
+    const Unit* FindNearestLarva();
+    const Unit* FindAvailableDrone();
+
+    int CountUnitType(UNIT_TYPEID unit_type);
+    Point2D FindEnemyBase();
+
+    bool TryBuildZergling();
+    void AttackWithZerglings(Point2D target);
+
+    const Unit* FindNearestVespeneGeyser(const Point2D& start);
 };
+
 
 #endif
