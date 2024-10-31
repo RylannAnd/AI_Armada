@@ -18,9 +18,11 @@ public:
 private:
     bool TryBuildDrone();
     bool TrySpawnOverlord();
-    bool TryBuildHatchery();
+    bool TryBuildHatcheryInNatural();
     bool TryBuildSpawningPool();
     bool TryBuildExtractor();
+    bool TryBuildQueen();
+    Point2D FindNaturalExpansionLocation(const Point2D &main_hatchery_pos);
 
     const Unit* FindNearestLarva();
     const Unit* FindAvailableDrone();
