@@ -86,13 +86,7 @@ bool BasicSc2Bot::TryBuildSpawningPool() {
 		return false;
 	}
 
-	const Unit *hatchery = nullptr;
-	for (const auto &unit : observation->GetUnits()) {
-		if (unit->unit_type == UNIT_TYPEID::ZERG_HATCHERY && unit->alliance == Unit::Alliance::Self) {
-			hatchery = unit;
-			break;
-		}
-	}
+	Point2D my_base = observation->GetStartLocation();
 
 	// Check if we have enough resources
 	if (observation->GetMinerals() >= 200) { // Spawning Pool costs 200 minerals
@@ -100,10 +94,10 @@ bool BasicSc2Bot::TryBuildSpawningPool() {
 		if (builder_drone) {
 			// Define a list of potential nearby build locations
 			std::vector<Point2D> build_locations = {
-				hatchery->pos + Point2D(3, 3),	// Bottom Right
-				hatchery->pos + Point2D(-3, 3), // Bottom Left
-				hatchery->pos + Point2D(3, -3), // Top Right
-				hatchery->pos + Point2D(-3, -3) // Top Left
+				my_base + Point2D(5, 5),	// Bottom Right
+				my_base + Point2D(-5, 5), // Bottom Left
+				my_base + Point2D(5, -5), // Top Right
+				my_base + Point2D(-5, -5) // Top Left
 			};
 
 			for (const auto &location : build_locations) {
@@ -120,22 +114,9 @@ bool BasicSc2Bot::TryBuildSpawningPool() {
 bool BasicSc2Bot::TryBuildExtractor() {
 	const ObservationInterface *observation = Observation();
 
-	// Find an unoccupied Vespene Geyser near a Hatchery
-	const Unit *hatchery = nullptr;
-	for (const auto &unit : observation->GetUnits()) {
-		if (unit->unit_type == UNIT_TYPEID::ZERG_HATCHERY && unit->alliance == Unit::Alliance::Self) {
-			hatchery = unit;
-			break;
-		}
-	}
-
-	if (!hatchery) {
-		return false;
-	}
-
 	if (observation->GetMinerals() > 25) {
 		// Find nearest Vespene Geyser
-		const Unit *geyser = FindNearestVespeneGeyser(hatchery->pos);
+		const Unit *geyser = FindNearestVespeneGeyser(observation->GetStartLocation());
 		const Unit *builder_drone = FindAvailableDrone();
 		if (geyser && builder_drone) {
 			Actions()->UnitCommand(builder_drone, ABILITY_ID::BUILD_EXTRACTOR, geyser);
@@ -165,8 +146,8 @@ bool BasicSc2Bot::TryBuildHatcheryInNatural() {
 	if (!main_hatchery) {
 		return false;
 	}
-
-	Point2D natural_expansion_pos = FindNaturalExpansionLocation(main_hatchery->pos);
+	Point2D my_base = observation->GetStartLocation();
+	Point2D natural_expansion_pos = FindNaturalExpansionLocation(my_base);
 
 	// get  available drone to build the hatchery
 	const Unit *builder_drone = FindAvailableDrone();
@@ -291,42 +272,23 @@ const Unit *BasicSc2Bot::FindNearestVespeneGeyser(const Point2D &start) {
 }
 
 Point2D BasicSc2Bot::FindNaturalExpansionLocation(const Point2D &main_hatchery_pos) {
-	// Start with an approximate offset based on main base spawn
-	Point2D start_location;
+	// Define potential natural expansion locations based on main base position
+    if (main_hatchery_pos == Point2D(20, 20)) {
+        // Top-left spawn
+        return Point2D(20, 80); // Example offset for top-left
+    } else if (main_hatchery_pos == Point2D(132, 20)) {
+        // Top-right spawn
+        return Point2D(132, 80); // Example offset for top-right
+    } else if (main_hatchery_pos == Point2D(20, 132)) {
+        // Bottom-left spawn
+        return Point2D(20, 172); // Example offset for bottom-left
+    } else if (main_hatchery_pos == Point2D(132, 132)) {
+        // Bottom-right spawn
+        return Point2D(132, 172); // Example offset for bottom-right
+    }
 
-	if (Distance2D(main_hatchery_pos, Point2D(20, 20)) < 10) {
-		// Top-left spawn
-		start_location = main_hatchery_pos + Point2D(20, -10);
-	} else if (Distance2D(main_hatchery_pos, Point2D(132, 20)) < 10) {
-		// Top-right spawn
-		start_location = main_hatchery_pos + Point2D(-20, -10);
-	} else if (Distance2D(main_hatchery_pos, Point2D(20, 132)) < 10) {
-		// Bottom-left spawn
-		start_location = main_hatchery_pos + Point2D(20, 10);
-	} else if (Distance2D(main_hatchery_pos, Point2D(132, 132)) < 10) {
-		// Bottom-right spawn
-		start_location = main_hatchery_pos + Point2D(-20, 10);
-	} else {
-		// Default offset if no spawn detected
-		start_location = main_hatchery_pos + Point2D(15, 15);
-	}
-
-	// Loop through potential locations in a small grid around the start_location
-	int search_radius = 10; // Adjust as needed
-	for (int dx = -search_radius; dx <= search_radius; dx++) {
-		for (int dy = -search_radius; dy <= search_radius; dy++) {
-			Point2D test_location = start_location + Point2D(dx, dy);
-
-			// Check if we can place a Hatchery at this location
-			if (Query()->Placement(ABILITY_ID::BUILD_HATCHERY, test_location)) {
-				return test_location;
-			}
-		}
-	}
-
-	// If no valid location is found, return the original approximate position
-	return start_location;
-}
+    // default invalid position if none match
+    return Point2D(0, 0);
 }
 
 // ATTACKING / SCOUTING
