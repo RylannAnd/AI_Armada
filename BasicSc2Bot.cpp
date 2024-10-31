@@ -49,6 +49,16 @@ void BasicSc2Bot::OnStep() {
 		TryBuildSpawningPool();
 		drone_count++;
 	}
+
+	if (drone_count >= 3 && drone_count <= 5){
+		Units extractors = Observation()->GetUnits(Unit::Self, IsUnit(UNIT_TYPEID::ZERG_EXTRACTOR));
+		const Unit* extractor = extractors[0];
+		if (extractor->assigned_harvesters <= 3){
+			const Unit* unit = FindAvailableDrone();
+			Actions()->UnitCommand(unit, ABILITY_ID::HARVEST_GATHER, extractor);
+			drone_count++;
+		}
+	}
 }
 
 //  void BasicSc2Bot::OnUnitIdle(const Unit* unit) {
@@ -156,7 +166,7 @@ bool BasicSc2Bot::TryBuildDrone() {
 	const ObservationInterface *observation = Observation();
 
 	// Build a drone when we have two overlord
-	if (observation->GetMinerals() >= 50 && observation->GetFoodUsed() <= 17 && CountUnitType(UNIT_TYPEID::ZERG_DRONE) < 17) {
+	if (observation->GetMinerals() >= 50 && observation->GetFoodUsed() <= 20 && CountUnitType(UNIT_TYPEID::ZERG_DRONE) < 20) {
 		// Find a larva to morph into a Drone.
 		const Unit *larva = FindNearestLarva();
 		if (larva) {
@@ -202,7 +212,8 @@ const Unit *BasicSc2Bot::FindAvailableDrone() {
 		if (unit->unit_type == UNIT_TYPEID::ZERG_DRONE && !unit->orders.empty()) {
 			// Ensure the drone's last order is to gather resources
 			const auto &last_order = unit->orders.back();
-			if (last_order.ability_id == ABILITY_ID::HARVEST_GATHER) {
+			const Unit* target_unit = observation->GetUnit(last_order.target_unit_tag);
+			if (last_order.ability_id == ABILITY_ID::HARVEST_GATHER && target_unit->unit_type == UNIT_TYPEID::NEUTRAL_MINERALFIELD) {
 				Actions()->UnitCommand(unit, ABILITY_ID::STOP);
 				return unit;
 			}
