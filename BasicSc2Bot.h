@@ -15,6 +15,7 @@ public:
 	virtual void OnStep();
     // virtual void OnUnitIdle(const Unit* unit);
 
+
 private:
     bool TryBuildDrone();
     bool TrySpawnOverlord();
@@ -30,6 +31,7 @@ private:
 
     bool TryBuildZergling();
     void AttackWithZerglings(Point2D target);
+    void UpgradeZerglings();
 
     const Unit* FindNearestVespeneGeyser(const Point2D& start);
 };

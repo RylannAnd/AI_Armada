@@ -24,11 +24,14 @@ void BasicSc2Bot::OnStep() {
         AttackWithZerglings(enemy_base);
     }
 
-	static int overlord_count = 0;
-    int required_overlords = (observation->GetFoodUsed() + 8) / 8;
-	if ((observation->GetFoodUsed() >= 13 && overlord_count == 0 && observation->GetMinerals() >= 100) || (overlord_count > 0 && overlord_count < required_overlords)) {
+	// Spawn more overlord if we are at the cap
+
+	// static int overlord_count = 0;
+    // int required_overlords = (observation->GetFoodUsed() + 8) / 8;
+	// if ((observation->GetFoodUsed() >= 13 && overlord_count == 0 && observation->GetMinerals() >= 100) || (overlord_count > 0 && overlord_count < required_overlords)) {
+	if (observation->GetFoodUsed() == observation->GetFoodCap()){
 		TrySpawnOverlord();
-		overlord_count++;
+		// overlord_count++;
 	}
 
 	TryBuildDrone();
@@ -50,7 +53,8 @@ void BasicSc2Bot::OnStep() {
 		drone_count++;
 	}
 
-	if (drone_count >= 3 && drone_count <= 5){
+	// Assign extra drones 3-5 to the extractor
+	if (drone_count >= 3 && drone_count <= 5 && observation->GetFoodUsed() == 20){
 		Units extractors = Observation()->GetUnits(Unit::Self, IsUnit(UNIT_TYPEID::ZERG_EXTRACTOR));
 		const Unit* extractor = extractors[0];
 		if (extractor->assigned_harvesters <= 3){
@@ -59,6 +63,12 @@ void BasicSc2Bot::OnStep() {
 			drone_count++;
 		}
 	}
+
+	// If not upgrades have been applied to any unit, upgrade zerglings
+	auto upgrades = observation->GetUpgrades();
+	 if (upgrades.empty()) {
+		UpgradeZerglings();
+    }
 }
 
 //  void BasicSc2Bot::OnUnitIdle(const Unit* unit) {
@@ -277,4 +287,15 @@ Point2D BasicSc2Bot::FindEnemyBase() {
         }
     }
     return Point2D(0, 0);
+}
+
+// UPGRADING
+// ======================================================================================================================
+void BasicSc2Bot::UpgradeZerglings(){
+	const ObservationInterface *observation = Observation();
+	Units spawning_pools = observation->GetUnits(Unit::Self, IsUnit(UNIT_TYPEID::ZERG_SPAWNINGPOOL));
+	
+	if (!spawning_pools.empty() && observation->GetMinerals() >= 100 && observation->GetVespene() >= 100){
+   		Actions()->UnitCommand(spawning_pools[0], ABILITY_ID::RESEARCH_ZERGLINGMETABOLICBOOST);
+	}
 }
