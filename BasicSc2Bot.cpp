@@ -1,6 +1,8 @@
 #include "BasicSc2Bot.h"
 #include "cpp-sc2/include/sc2api/sc2_common.h"
 #include "cpp-sc2/include/sc2api/sc2_typeenums.h"
+#include "cpp-sc2/include/sc2lib/sc2_search.h"
+#include <cmath>
 #include <iostream>
 #include <sc2api/sc2_interfaces.h>
 #include <sc2api/sc2_map_info.h>
@@ -156,8 +158,7 @@ bool BasicSc2Bot::TryBuildHatcheryInNatural() {
 	}
 
 	// verify that the location is buildable
-	if (Query()->Placement(ABILITY_ID::BUILD_HATCHERY, natural_expansion_pos)) {
-		std::cout << "Building Hatchery at natural expansion location" << std::endl;
+	if (Query()->Placement(ABILITY_ID::BUILD_HATCHERY, natural_expansion_pos, builder_drone)) {
 		Actions()->UnitCommand(builder_drone, ABILITY_ID::BUILD_HATCHERY, natural_expansion_pos);
 		return true;
 	}
@@ -272,23 +273,17 @@ const Unit *BasicSc2Bot::FindNearestVespeneGeyser(const Point2D &start) {
 }
 
 Point2D BasicSc2Bot::FindNaturalExpansionLocation(const Point2D &main_hatchery_pos) {
-	// Define potential natural expansion locations based on main base position
-    if (main_hatchery_pos == Point2D(20, 20)) {
-        // Top-left spawn
-        return Point2D(20, 80); // Example offset for top-left
-    } else if (main_hatchery_pos == Point2D(132, 20)) {
-        // Top-right spawn
-        return Point2D(132, 80); // Example offset for top-right
-    } else if (main_hatchery_pos == Point2D(20, 132)) {
-        // Bottom-left spawn
-        return Point2D(20, 172); // Example offset for bottom-left
-    } else if (main_hatchery_pos == Point2D(132, 132)) {
-        // Bottom-right spawn
-        return Point2D(132, 172); // Example offset for bottom-right
-    }
-
-    // default invalid position if none match
-    return Point2D(0, 0);
+	QueryInterface *query = Query();
+	const ObservationInterface *observation = Observation();
+	std::vector<Point3D> expansion_locations = sc2::search::CalculateExpansionLocations(observation, query);
+	Point3D my_base = observation->GetStartLocation();
+	Point3D min = Point3D(1000, 1000, 1000);
+	for (auto it : expansion_locations) {
+		if (abs(my_base.x - it.x) + abs(my_base.y - it.y) < abs(my_base.x - min.x) + abs(my_base.y - min.y)) {
+			min = it;
+		}
+	}
+	return min;
 }
 
 // ATTACKING / SCOUTING
