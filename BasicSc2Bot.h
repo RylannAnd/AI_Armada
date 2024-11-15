@@ -13,15 +13,27 @@ class BasicSc2Bot : public sc2::Agent {
 public:
 	virtual void OnGameStart();
 	virtual void OnStep();
-    // virtual void OnUnitIdle(const Unit* unit);
+    virtual void OnUnitIdle(const Unit* unit);
 
 
 private:
+    std::vector<Point2D> possible_enemy_locations;
+    size_t current_scout_index = 0;
+    Point2D enemy_base_location = Point2D(-1, -1);
+    int num_zergling_upgrades = 0;
+    bool building_pit = false;
+
     bool TryBuildDrone();
+
+    bool TryBuildHive();
+    bool TryBuildLair();
+    bool TryBuildInfestationPit();
+
     bool TrySpawnOverlord();
     bool TryBuildHatchery();
     bool TryBuildSpawningPool();
     bool TryBuildExtractor();
+    void RetreatScouters();
 
     const Unit* FindNearestLarva();
     const Unit* FindAvailableDrone();
@@ -32,6 +44,7 @@ private:
     bool TryBuildZergling();
     void AttackWithZerglings(Point2D target);
     void UpgradeZerglings();
+    void UpgradeZerglingsAdrenalGlands();
 
     const Unit* FindNearestVespeneGeyser(const Point2D& start);
 };
