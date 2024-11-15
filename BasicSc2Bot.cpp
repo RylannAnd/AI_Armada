@@ -34,7 +34,7 @@ void BasicSc2Bot::OnStep() {
     // Find enemy base
     if (enemy_base_location.x == -1 && enemy_base_location.y == -1) {
         enemy_base_location = FindEnemyBase();
-    } else if (CountUnitType(UNIT_TYPEID::ZERG_ZERGLING) >= 10) {
+    } else if (CountUnitType(UNIT_TYPEID::ZERG_ZERGLING) >= 30) {
         AttackWithZerglings(enemy_base_location);
     } else{
 		RetreatScouters();
