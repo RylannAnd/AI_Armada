@@ -35,15 +35,22 @@ private:
     const Unit* FindAvailableDrone();
 
     int CountUnitType(UNIT_TYPEID unit_type);
-    Point2D FindEnemyBase();
+    
+    Point2D SeeEnemy();
+    void AttackWithZerglings();
+    double FindDamage (const UnitTypeData unit_data);
+    bool IsStructure (const UnitTypeData unit_data);
 
     bool TryBuildZergling();
-    void AttackWithZerglings(Point2D target);
 
     const Unit* FindNearestVespeneGeyser(const Point2D& start);
 
 
-    bool AssignExtractorWorkers();
+    void AssignExtractorWorkers();
+    
+    // data
+    std::vector<Point2D> structures;
+    int structure_target = 0;
 };
 
 

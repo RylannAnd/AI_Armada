@@ -16,13 +16,13 @@ void BasicSc2Bot::OnGameStart() { return; }
 void BasicSc2Bot::OnStep() {
 	const ObservationInterface *observation = Observation();
 
-	// Find enemy base
-	static Point2D enemy_base = Point2D(0, 0);
-	if (enemy_base == Point2D(0, 0)) {
-		enemy_base = FindEnemyBase();
-	} else if (CountUnitType(UNIT_TYPEID::ZERG_ZERGLING) >= 8) {
-		AttackWithZerglings(enemy_base);
-	}
+    TryBuildZergling();
+
+
+    // ATTACKING LOGIC
+	// =================================================================================================
+    AttackWithZerglings();
+	// =================================================================================================
 
 	static int overlord_count = 0;
 	int required_overlords = (observation->GetFoodUsed() + 8) / 8;
@@ -40,8 +40,6 @@ void BasicSc2Bot::OnStep() {
 	static bool create_extractor = true;
 	static bool expand = true;
 	static int num_zergling_upgrades = 0;
-
-	TryBuildZergling();
 
 
 	if (observation->GetFoodUsed() >= 17) {
@@ -111,7 +109,7 @@ void BasicSc2Bot::OnStep() {
 	}
 }
 
-bool BasicSc2Bot::AssignExtractorWorkers(){
+void BasicSc2Bot::AssignExtractorWorkers(){
 	Units extractors = Observation()->GetUnits(Unit::Self, IsUnit(UNIT_TYPEID::ZERG_EXTRACTOR));
 		const Unit* extractor = extractors[0];
 		
@@ -413,28 +411,44 @@ Point2D BasicSc2Bot::FindNaturalExpansionLocation(const Point2D &main_hatchery_p
 
 // ATTACKING / SCOUTING
 // ======================================================================================================================
-void BasicSc2Bot::AttackWithZerglings(Point2D target) {
-	auto zerglings = Observation()->GetUnits([&](const Unit &unit) {
-		return unit.unit_type == UNIT_TYPEID::ZERG_ZERGLING && unit.alliance == Unit::Alliance::Self;
-	});
 
-	if (target != Point2D(0, 0)) {
-		for (const auto &zergling : zerglings) {
-			Actions()->UnitCommand(zergling, ABILITY_ID::ATTACK, target);
+void BasicSc2Bot::AttackWithZerglings() {
+    auto zerglings = Observation()->GetUnits([&](const Unit& unit) {
+            return unit.unit_type == UNIT_TYPEID::ZERG_ZERGLING && unit.alliance == Unit::Alliance::Self;
+    });
+
+	// if enough zerglings
+	if (zerglings.size() >= 12) {
+		Point2D target = SeeEnemy();
+
+		// if no enemies in sight
+		if (target == Point2D(-1, -1)) {
+			// If enemy structures have been found
+			if (structure_target < structures.size())
+			{
+				Point2D next_structure = structures[structure_target];
+
+				// If at that structure and no structure is there, move to next target index
+				// otherwise target that structure
+				if (Distance2D(zerglings.front()->pos, next_structure) < 1.0) {
+					++structure_target;
+				} else {
+					target = next_structure;
+				}
+			}
+		}
+
+		// if target has been found
+		if (target != Point2D(-1, -1)) {
+			for (auto& zergling : zerglings) {
+				// Check if the Zergling is already moving to the target
+				if (zergling->orders.empty() || zergling->orders.front().ability_id != ABILITY_ID::ATTACK) {
+					// Issue the attack command to the target
+					Actions()->UnitCommand(zergling, ABILITY_ID::ATTACK, target);
+				}
+			}
 		}
 	}
-}
-
-// For later scouting use
-Point2D BasicSc2Bot::FindEnemyBase() {
-	for (const auto &enemy_struct : Observation()->GetUnits(Unit::Alliance::Enemy)) {
-		if (enemy_struct->unit_type == UNIT_TYPEID::ZERG_HATCHERY ||
-			enemy_struct->unit_type == UNIT_TYPEID::PROTOSS_NEXUS ||
-			enemy_struct->unit_type == UNIT_TYPEID::TERRAN_COMMANDCENTER) {
-			return enemy_struct->pos;
-		}
-	}
-	return Point2D(0, 0);
 }
 
 bool BasicSc2Bot::TryInject() {
@@ -480,4 +494,47 @@ bool BasicSc2Bot::TryInject() {
 	}
 
 	return false; // No eligible Hatchery or available Queen found.
+}
+
+// Determine the damage of a unit
+double BasicSc2Bot::FindDamage (const UnitTypeData unit_data) {
+	double damage = 0;
+	for (const auto& weapon : unit_data.weapons) {
+    	 damage += weapon.damage_;
+    }
+	return damage;
+}
+
+// Determine if a unit is a structure
+bool BasicSc2Bot::IsStructure (const UnitTypeData unit_data) {
+	for (const auto& attribute : unit_data.attributes) {
+		if (attribute == sc2::Attribute::Structure) {
+			return true;
+		}
+    }
+	return false;
+}
+
+// When an enemy is seen, return the most dangerous targets and add any structures to a vector
+Point2D BasicSc2Bot::SeeEnemy() {
+	Point2D best_target = Point2D(-1, -1);
+	double most_damage = -INFINITY;
+	
+	// Look at all visable all Units
+    for (const auto& enemy : Observation()->GetUnits(Unit::Alliance::Enemy)) {
+		const auto& unit_info = Observation()->GetUnitTypeData().at(enemy->unit_type);
+		if (IsStructure(unit_info)) {
+			// Add Structure to
+			structures.push_back(enemy->pos);
+		} else {
+			// Check for military unit or worker with most damage
+			double unit_damage = FindDamage(unit_info);
+			if (unit_damage > most_damage) {
+				most_damage = unit_damage;
+				best_target = enemy->pos;
+			}
+		}
+    }
+
+    return best_target;
 }
