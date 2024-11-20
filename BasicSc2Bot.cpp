@@ -3,6 +3,7 @@
 #include "cpp-sc2/include/sc2api/sc2_typeenums.h"
 #include "cpp-sc2/include/sc2lib/sc2_search.h"
 #include <cmath>
+#include <cstddef>
 #include <iostream>
 #include <sc2api/sc2_interfaces.h>
 #include <sc2api/sc2_map_info.h>
@@ -30,25 +31,24 @@ void BasicSc2Bot::OnStep() {
 		overlord_count++;
 	}
 
-	static int drone_cap = 17;
+	static int drone_cap = 20;
 	if (CountUnitType(UNIT_TYPEID::ZERG_DRONE) < drone_cap) {
 		TryBuildDrone();
 	}
 
-	if (CountUnitType(UNIT_TYPEID::ZERG_ZERGLING) < 8) {
-		// TryBuildZergling();
-	}
-
 	static bool spawn_pool = true;
-	static bool extractor = true;
+	static bool create_extractor = true;
 	static bool expand = true;
+	static int num_zergling_upgrades = 0;
 
-	if (observation->GetFoodUsed() >= 17) {						// rush phase
-		// Build Extractor
-		if (extractor && observation->GetMinerals() >= 25) {
+	TryBuildZergling();
+
+
+	if (observation->GetFoodUsed() >= 17) {
+		if (create_extractor && observation->GetMinerals() >= 25) {
 			std::cout << "building extractor" << std::endl;
 			TryBuildExtractor();
-			extractor = false;
+			create_extractor = false;
 		}
 
 		// Build Spawning Pool
@@ -65,18 +65,60 @@ void BasicSc2Bot::OnStep() {
 			expand = false;
 		}
 
-		// Make Queens
-		if (CountUnitType(UNIT_TYPEID::ZERG_QUEEN) < 2 && observation->GetMinerals() >= 150 && expand == false) {
+		// morph lair
+		if (CountUnitType(UNIT_TYPEID::ZERG_LAIR) < 1){
+			TryBuildUnit(ABILITY_ID::MORPH_LAIR,UNIT_TYPEID::ZERG_HATCHERY);
+		}
+
+		// Make Queens 
+		if (CountUnitType(UNIT_TYPEID::ZERG_LAIR) > 0 && CountUnitType(UNIT_TYPEID::ZERG_QUEEN) < 2 && observation->GetMinerals() >= 150 && expand == false) {
 			TryBuildQueen();
 		}
 
-		// Do Injections for extra larvae
-		if (CountUnitType(UNIT_TYPEID::ZERG_QUEEN) > 0) {
-			if (TryInject()) {
-				std::cout << "Injecting" << std::endl;
-			}
+		
+		if (CountUnitType(UNIT_TYPEID::ZERG_EXTRACTOR) > 0 && expand == false) {
+			AssignExtractorWorkers();
 		}
+
+
+		if (CountUnitType(UNIT_TYPEID::ZERG_INFESTATIONPIT) < 1){
+			TryBuildStructure(ABILITY_ID::BUILD_INFESTATIONPIT, UNIT_TYPEID::ZERG_DRONE);
+		}
+
+		if (CountUnitType(UNIT_TYPEID::ZERG_HIVE) < 1){
+			TryBuildUnit(ABILITY_ID::MORPH_HIVE, UNIT_TYPEID::ZERG_LAIR);
+		}
+
+		// Do Injections for extra larvae after lair is built
+		if (CountUnitType(UNIT_TYPEID::ZERG_LAIR) > 0 && CountUnitType(UNIT_TYPEID::ZERG_QUEEN) > 0) {
+			TryInject();
+		}
+
+		// Upgrade zerling abilities
+		if (num_zergling_upgrades == 0) {
+			std::vector<UpgradeID> completed_upgrades = observation->GetUpgrades();
+
+			if (std::find(completed_upgrades.begin(), completed_upgrades.end(), UPGRADE_ID::ZERGLINGMOVEMENTSPEED) != completed_upgrades.end()) {
+				num_zergling_upgrades++;
+			} else {
+				TryBuildUnit(ABILITY_ID::RESEARCH_ZERGLINGMETABOLICBOOST, UNIT_TYPEID::ZERG_SPAWNINGPOOL);
+				
+			}
+		}else if (num_zergling_upgrades == 1) {
+			TryBuildUnit(ABILITY_ID::RESEARCH_ZERGLINGADRENALGLANDS, UNIT_TYPEID::ZERG_SPAWNINGPOOL);
+		}
+		
 	}
+}
+
+bool BasicSc2Bot::AssignExtractorWorkers(){
+	Units extractors = Observation()->GetUnits(Unit::Self, IsUnit(UNIT_TYPEID::ZERG_EXTRACTOR));
+		const Unit* extractor = extractors[0];
+		
+		if (extractor->assigned_harvesters < 3){
+			const Unit* unit = FindAvailableDrone();	
+			Actions()->UnitCommand(unit, ABILITY_ID::HARVEST_GATHER, extractor);
+		}
 }
 
 // CORE BUILDINGS / HARVESTING
@@ -183,28 +225,17 @@ bool BasicSc2Bot::TryBuildZergling() {
 bool BasicSc2Bot::TryBuildDrone() {
     const ObservationInterface* observation = Observation();
 
-    // Check if we have enough resources to build a drone.
-    if (observation->GetMinerals() >= 50) {
-        // Iterate through all Hatcheries, Lairs, and Hives to find larvae.
-        for (const auto& hatchery : observation->GetUnits(Unit::Alliance::Self)) {
-            if (hatchery->unit_type == UNIT_TYPEID::ZERG_HATCHERY ||
-                hatchery->unit_type == UNIT_TYPEID::ZERG_LAIR ||
-                hatchery->unit_type == UNIT_TYPEID::ZERG_HIVE) {
-
-                // Check if there are available larvae at this Hatchery.
-                for (const auto& larva : observation->GetUnits(Unit::Alliance::Self)) {
-                    if (larva->unit_type == UNIT_TYPEID::ZERG_LARVA &&
-                        Distance2D(hatchery->pos, larva->pos) < 10.0f) { // Ensure larva belongs to this Hatchery.
-
-                        // Command the larva to morph into a Drone.
-                        Actions()->UnitCommand(larva, ABILITY_ID::TRAIN_DRONE);
-                        return true;
-                    }
-                }
-            }
-        }
-    }
-    return false; // Not enough resources or no available larva found.
+	// Build a drone when we have two overlord
+	if (observation->GetMinerals() >= 50 && observation->GetFoodUsed() <= 20 && CountUnitType(UNIT_TYPEID::ZERG_DRONE) < 20) {
+		// Find a larva to morph into a Drone.
+		const Unit *larva = FindNearestLarva();
+		if (larva) {
+			Actions()->UnitCommand(larva, ABILITY_ID::TRAIN_DRONE);
+			// Actions()->UnitCommand(unit, ABILITY_ID::STOP);
+			return true;
+		}
+	}
+	return false;
 }
 
 
@@ -244,6 +275,69 @@ bool BasicSc2Bot::TryBuildQueen() {
 	return false; // Not enough minerals or no eligible Hatchery/Lair/Hive found.
 }
 
+
+bool BasicSc2Bot::GetRandomUnit(const Unit*& unit_out, const ObservationInterface* observation, UnitTypeID unit_type) {
+    Units my_units = observation->GetUnits(Unit::Alliance::Self);
+    // std::random_shuffle(my_units.begin(), my_units.end()); // Doesn't work, or doesn't work well.
+    for (const auto unit : my_units) {
+        if (unit->unit_type == unit_type) {
+            unit_out = unit;
+            return true;
+        }
+    }
+    return false;
+}
+
+
+bool BasicSc2Bot::TryBuildStructure(AbilityID ability_type_for_structure, UnitTypeID unit_type) {
+    const ObservationInterface* observation = Observation();
+
+    // If a unit already is building a supply structure of this type, do nothing.
+    Units units = observation->GetUnits(Unit::Alliance::Self);
+    for (const auto& unit : units) {
+        for (const auto& order : unit->orders) {
+            if (order.ability_id == ability_type_for_structure) {
+                return false;
+            }
+        }
+    }
+
+    // Just try a random location near the unit.
+    const Unit* unit = nullptr;
+    if (!GetRandomUnit(unit, observation, unit_type)){
+        return false;
+	}
+
+    float rx = GetRandomScalar();
+    float ry = GetRandomScalar();
+
+    Actions()->UnitCommand(unit, ability_type_for_structure, unit->pos + Point2D(rx, ry) * 9.0f);
+    return true;
+}
+
+bool BasicSc2Bot::TryBuildUnit(AbilityID ability_type_for_unit, UnitTypeID unit_type) {
+    const ObservationInterface* observation = Observation();
+
+    //If we are at supply cap, don't build anymore units, unless its an overlord.
+    if (observation->GetFoodUsed() >= observation->GetFoodCap() && ability_type_for_unit != ABILITY_ID::TRAIN_OVERLORD) {
+        return false;
+    }
+    const Unit* unit = nullptr;
+    if (!GetRandomUnit(unit, observation, unit_type)) {
+        return false;
+    }
+    if (!unit->orders.empty()) {
+        return false;
+    }
+
+    if (unit->build_progress != 1) {
+        return false;
+    }
+
+    Actions()->UnitCommand(unit, ability_type_for_unit);
+    return true;
+}
+
 // FIND UNITS
 // ===========================================================================================================
 const Unit *BasicSc2Bot::FindNearestLarva() {
@@ -265,7 +359,7 @@ const Unit *BasicSc2Bot::FindAvailableDrone() {
 			// Ensure the drone's last order is to gather resources
 			const auto &last_order = unit->orders.back();
 			if (last_order.ability_id == ABILITY_ID::HARVEST_GATHER) {
-				Actions()->UnitCommand(unit, ABILITY_ID::STOP);
+				// Actions()->UnitCommand(unit, ABILITY_ID::STOP);
 				return unit;
 			}
 		}

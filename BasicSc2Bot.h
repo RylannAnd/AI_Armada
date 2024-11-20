@@ -25,6 +25,12 @@ private:
     bool TryInject();
     Point2D FindNaturalExpansionLocation(const Point2D &main_hatchery_pos);
 
+
+    bool GetRandomUnit(const Unit*& unit_out, const ObservationInterface* observation, UnitTypeID unit_type);
+
+    bool TryBuildStructure(AbilityID ability_type_for_structure, UnitTypeID unit_type); 
+    bool TryBuildUnit(AbilityID ability_type_for_unit, UnitTypeID unit_type);
+
     const Unit* FindNearestLarva();
     const Unit* FindAvailableDrone();
 
@@ -35,6 +41,9 @@ private:
     void AttackWithZerglings(Point2D target);
 
     const Unit* FindNearestVespeneGeyser(const Point2D& start);
+
+
+    bool AssignExtractorWorkers();
 };
 
 
