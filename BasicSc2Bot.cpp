@@ -2,6 +2,7 @@
 #include "cpp-sc2/include/sc2api/sc2_common.h"
 #include "cpp-sc2/include/sc2api/sc2_typeenums.h"
 #include <iostream>
+#include <ostream>
 #include <sc2api/sc2_interfaces.h>
 #include <sc2api/sc2_unit_filters.h>
 
@@ -29,7 +30,7 @@ void BasicSc2Bot::OnStep() {
 	const ObservationInterface *observation = Observation();
 
     TryBuildZergling();
-
+	
     static bool rush = false;
     // Find enemy base
     if (enemy_base_location.x == -1 && enemy_base_location.y == -1) {
@@ -46,10 +47,6 @@ void BasicSc2Bot::OnStep() {
 	}
 
 	TryBuildDrone();
-
-	TryBuildLair();
-	// TryBuildInfestationPit();
-	// TryBuildHive();
 
 	static int drone_count = 0;
 	if (drone_count == 0 && observation->GetFoodUsed() == 17) {
@@ -79,12 +76,39 @@ void BasicSc2Bot::OnStep() {
 		}
 	}
 
+	if (drone_count == 7 && observation->GetMinerals() >= 150 && observation->GetVespene() >= 100){
+		TryBuildUnit(ABILITY_ID::MORPH_LAIR,UNIT_TYPEID::ZERG_HATCHERY);
+		drone_count++;
+	}
+
+	if (drone_count == 8 && CountUnitType(UNIT_TYPEID::ZERG_LAIR) > 0){
+		
+		if (CountUnitType(UNIT_TYPEID::ZERG_INFESTATIONPIT) > 0){
+			drone_count++;
+		}else{
+			TryBuildStructure(ABILITY_ID::BUILD_INFESTATIONPIT, UNIT_TYPEID::ZERG_DRONE);
+		}
+	}
+
+	if (drone_count == 9){
+		TryBuildUnit(ABILITY_ID::MORPH_HIVE, UNIT_TYPEID::ZERG_LAIR);
+		if (CountUnitType(UNIT_TYPEID::ZERG_HIVE) > 0){
+			drone_count++;
+		}
+	}
+
 	// If not upgrades have been applied to any unit, upgrade zerglings
 	 if (num_zergling_upgrades == 0) {
-		UpgradeZerglings();
-		num_zergling_upgrades++;
+		std::vector<UpgradeID> completed_upgrades = observation->GetUpgrades();
+
+		if (std::find(completed_upgrades.begin(), completed_upgrades.end(), UPGRADE_ID::ZERGLINGMOVEMENTSPEED) != completed_upgrades.end()) {
+			num_zergling_upgrades++;
+		} else {
+			TryBuildUnit(ABILITY_ID::RESEARCH_ZERGLINGMETABOLICBOOST, UNIT_TYPEID::ZERG_SPAWNINGPOOL);
+			
+		}
     }else if (num_zergling_upgrades == 1) {
-		UpgradeZerglingsAdrenalGlands();
+		TryBuildUnit(ABILITY_ID::RESEARCH_ZERGLINGADRENALGLANDS, UNIT_TYPEID::ZERG_SPAWNINGPOOL);
 	}
 }
 
@@ -129,6 +153,48 @@ bool BasicSc2Bot::TryBuildSpawningPool() {
 	}
 	return false;
 }
+
+
+bool BasicSc2Bot::GetRandomUnit(const Unit*& unit_out, const ObservationInterface* observation, UnitTypeID unit_type) {
+    Units my_units = observation->GetUnits(Unit::Alliance::Self);
+    // std::random_shuffle(my_units.begin(), my_units.end()); // Doesn't work, or doesn't work well.
+    for (const auto unit : my_units) {
+        if (unit->unit_type == unit_type) {
+            unit_out = unit;
+            return true;
+        }
+    }
+    return false;
+}
+
+
+bool BasicSc2Bot::TryBuildStructure(AbilityID ability_type_for_structure, UnitTypeID unit_type) {
+    const ObservationInterface* observation = Observation();
+
+    // If a unit already is building a supply structure of this type, do nothing.
+    Units units = observation->GetUnits(Unit::Alliance::Self);
+    for (const auto& unit : units) {
+        for (const auto& order : unit->orders) {
+            if (order.ability_id == ability_type_for_structure) {
+                return false;
+            }
+        }
+    }
+
+    // Just try a random location near the unit.
+    const Unit* unit = nullptr;
+    if (!GetRandomUnit(unit, observation, unit_type)){
+        return false;
+	}
+
+    float rx = GetRandomScalar();
+    float ry = GetRandomScalar();
+
+    Actions()->UnitCommand(unit, ability_type_for_structure, unit->pos + Point2D(rx, ry) * 9.0f);
+    return true;
+}
+
+
 
 bool BasicSc2Bot::TryBuildExtractor() {
 	const ObservationInterface *observation = Observation();
@@ -205,90 +271,28 @@ bool BasicSc2Bot::TrySpawnOverlord() {
 	return false;
 }
 
-bool BasicSc2Bot::TryBuildLair() {
-	const ObservationInterface *observation = Observation();
+bool BasicSc2Bot::TryBuildUnit(AbilityID ability_type_for_unit, UnitTypeID unit_type) {
+    const ObservationInterface* observation = Observation();
 
-	// Check if we already have a Lair
-	if (CountUnitType(UNIT_TYPEID::ZERG_LAIR) > 0) {
-		return true;
-	}
-
-	// Find the Hatchery unit (a prerequisite for building a Lair)
-	const Unit *hatchery = nullptr;
-	for (const auto &unit : observation->GetUnits()) {
-		if (unit->unit_type == UNIT_TYPEID::ZERG_HATCHERY && unit->alliance == Unit::Alliance::Self) {
-			hatchery = unit;
-			break;
-		}
-	}
-
-	// Check if we have enough resources to build the Lair (150 minerals, 100 vespene gas)
-	if (observation->GetMinerals() >= 150 && observation->GetVespene() >= 100 && hatchery != nullptr) {
-		std::cout << "Morphing hatchery into lair" << std::endl;
-		Actions()->UnitCommand(hatchery, ABILITY_ID::MORPH_LAIR);
-	}
-
-	return false;
-}
-
-bool BasicSc2Bot::TryBuildInfestationPit() {
-    const ObservationInterface *observation = Observation();
-
-    // Check if we already have an Infestation Pit
-    if (CountUnitType(UNIT_TYPEID::ZERG_INFESTATIONPIT) > 0) {
-        return true;
+    //If we are at supply cap, don't build anymore units, unless its an overlord.
+    if (observation->GetFoodUsed() >= observation->GetFoodCap() && ability_type_for_unit != ABILITY_ID::TRAIN_OVERLORD) {
+        return false;
+    }
+    const Unit* unit = nullptr;
+    if (!GetRandomUnit(unit, observation, unit_type)) {
+        return false;
+    }
+    if (!unit->orders.empty()) {
+        return false;
     }
 
-    const Unit *lair = nullptr;
-    for (const auto &unit : observation->GetUnits()) {
-        if (unit->unit_type == UNIT_TYPEID::ZERG_LAIR && unit->alliance == Unit::Alliance::Self) {
-            lair = unit;
-            break;
-        }
+    if (unit->build_progress != 1) {
+        return false;
     }
 
-    // Check if we have enough resources
-    if (observation->GetMinerals() >= 100 && observation->GetVespene() >= 100 && lair != nullptr) {
-        const Unit *builder_drone = FindAvailableDrone();
-        if (builder_drone) {
-			std::cout << "Building Infestation Pit near Lair" << std::endl;
-            Actions()->UnitCommand(builder_drone, ABILITY_ID::BUILD_INFESTATIONPIT,builder_drone->pos);
-			building_pit = true;
-        }
-    }
-    return false;
+    Actions()->UnitCommand(unit, ability_type_for_unit);
+    return true;
 }
-
-
-bool BasicSc2Bot::TryBuildHive() {
-	const ObservationInterface *observation = Observation();
-
-	// Check if we already have a Hive
-	if (CountUnitType(UNIT_TYPEID::ZERG_HIVE) > 0) {
-		return true;
-	}
-
-	// Find the Lair unit (a prerequisite for building a Hive)
-	const Unit *lair = nullptr;
-	for (const auto &unit : observation->GetUnits()) {
-		if (unit->unit_type == UNIT_TYPEID::ZERG_LAIR && unit->alliance == Unit::Alliance::Self) {
-			lair = unit;
-			break;
-		}
-	}
-
-	// Check if we have enough resources to build the Hive (300 minerals, 200 vespene gas)
-	if (observation->GetMinerals() >= 300 && observation->GetVespene() >= 200 && lair != nullptr) {
-		
-		std::cout << "Morphing Lair into hive" << std::endl;
-		Actions()->UnitCommand(lair, ABILITY_ID::MORPH_HIVE);
-	
-	}
-
-	return false;
-}
-
-
 
 // FIND UNITS
 // ===========================================================================================================
@@ -375,8 +379,8 @@ Point2D BasicSc2Bot::FindEnemyBase() {
             return enemy_struct->pos;
         }
 
-		// Check for enemy units (combat units like Zerglings, Marines, etc.)
-    	for (const auto& enemy_unit : Observation()->GetUnits(Unit::Alliance::Enemy)) {
+	// Check for enemy units (combat units like Zerglings, Marines, etc.)
+    for (const auto& enemy_unit : Observation()->GetUnits(Unit::Alliance::Enemy)) {
         if (enemy_unit->unit_type == UNIT_TYPEID::ZERG_ZERGLING || 
             enemy_unit->unit_type == UNIT_TYPEID::TERRAN_MARINE || 
             enemy_unit->unit_type == UNIT_TYPEID::PROTOSS_ZEALOT) {
@@ -402,34 +406,4 @@ void BasicSc2Bot::RetreatScouters() {
 		Actions()->UnitCommand(overlord, ABILITY_ID::MOVE_MOVE, retreat_position);
 
 	}
-}
-
-
-// UPGRADING
-// ======================================================================================================================
-void BasicSc2Bot::UpgradeZerglings(){
-	const ObservationInterface *observation = Observation();
-	Units spawning_pools = observation->GetUnits(Unit::Self, IsUnit(UNIT_TYPEID::ZERG_SPAWNINGPOOL));
-	
-	if (!spawning_pools.empty() && observation->GetMinerals() >= 100 && observation->GetVespene() >= 100){
-   		Actions()->UnitCommand(spawning_pools[0], ABILITY_ID::RESEARCH_ZERGLINGMETABOLICBOOST);
-	}
-}
-
-void BasicSc2Bot::UpgradeZerglingsAdrenalGlands(){
-    const ObservationInterface *observation = Observation();
-
-    // Check if you have a Spawning Pool
-    Units spawning_pools = observation->GetUnits(Unit::Self, IsUnit(UNIT_TYPEID::ZERG_SPAWNINGPOOL));
-
-    // Check if you have a Hive
-    Units hives = observation->GetUnits(Unit::Self, IsUnit(UNIT_TYPEID::ZERG_HIVE));
-
-    // If you have a Spawning Pool, a Hive, and enough resources
-    if (!spawning_pools.empty() && !hives.empty() &&
-        observation->GetMinerals() >= 150 && observation->GetVespene() >= 150) {
-        
-        // Perform the upgrade for Adrenal Glands
-        Actions()->UnitCommand(spawning_pools[0], ABILITY_ID::RESEARCH_ZERGLINGADRENALGLANDS);
-    }
 }
