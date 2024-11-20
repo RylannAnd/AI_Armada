@@ -48,6 +48,11 @@ private:
     void AttackWithZerglings(Point2D target);
 
     const Unit* FindNearestVespeneGeyser(const Point2D& start);
+
+    const Unit* FindNearestMineralField(const Point2D& start);
+    const Unit* FindNearestTownHall(const Point2D& start);
+    
+
 };
 
 

@@ -9,20 +9,81 @@
 using namespace sc2;
 
 void BasicSc2Bot::OnGameStart() { 
-	const ObservationInterface* observation = Observation();
+    const ObservationInterface* observation = Observation();
     possible_enemy_locations = observation->GetGameInfo().enemy_start_locations;
 
-	return;
+    // Force a drone to scout
+    const Unit* scout_drone = FindAvailableDrone();
+    if (scout_drone && !possible_enemy_locations.empty()) {
+        Actions()->UnitCommand(scout_drone, ABILITY_ID::MOVE_MOVE, possible_enemy_locations[0]);
+        current_scout_index = 1; // Prepare for next location
+    }
+
+    return;
 }
 
-void BasicSc2Bot::OnUnitIdle(const Unit* unit){
-	if (unit->unit_type == UNIT_TYPEID::ZERG_OVERLORD) {
-		// Move the Overlord to the next possible enemy location.
-		if (enemy_base_location.x == -1 && enemy_base_location.y == -1){
-			Actions()->UnitCommand(unit, ABILITY_ID::MOVE_MOVE, possible_enemy_locations[current_scout_index]);
-			current_scout_index = ++current_scout_index % possible_enemy_locations.size();
-		}
-	}
+void BasicSc2Bot::OnUnitIdle(const Unit* unit) {
+    // If it's a drone that was scouting
+    if (unit->unit_type == UNIT_TYPEID::ZERG_DRONE) {
+        // Check if we have more locations to scout
+        if (current_scout_index < possible_enemy_locations.size()) {
+            Actions()->UnitCommand(unit, ABILITY_ID::MOVE_MOVE, possible_enemy_locations[current_scout_index]);
+            current_scout_index++;
+        } else {
+            // Find our own base location to return to
+            const Unit* townhall = FindNearestTownHall(unit->pos);
+            if (townhall) {
+                // First move to the base
+                Actions()->UnitCommand(unit, ABILITY_ID::MOVE_MOVE, townhall->pos);
+                
+                // Then find a mineral field to mine
+                const Unit* nearby_mineral = FindNearestMineralField(townhall->pos);
+                if (nearby_mineral) {
+                    // Queue the harvest gather command after moving
+                    Actions()->UnitCommand(unit, ABILITY_ID::HARVEST_GATHER, nearby_mineral);
+                }
+            }
+        }
+    }
+}
+
+// New helper method to find nearest town hall
+const Unit* BasicSc2Bot::FindNearestTownHall(const Point2D& start) {
+    const ObservationInterface* observation = Observation();
+    const Unit* nearest_townhall = nullptr;
+    float min_distance = std::numeric_limits<float>::max();
+
+    for (const auto& unit : observation->GetUnits()) {
+        // Check for Zerg town halls (Hatchery, Lair, Hive)
+        if (unit->unit_type == UNIT_TYPEID::ZERG_HATCHERY || 
+            unit->unit_type == UNIT_TYPEID::ZERG_LAIR || 
+            unit->unit_type == UNIT_TYPEID::ZERG_HIVE) {
+            float distance = DistanceSquared2D(unit->pos, start);
+            if (distance < min_distance) {
+                min_distance = distance;
+                nearest_townhall = unit;
+            }
+        }
+    }
+    return nearest_townhall;
+}
+
+// Helper method to find nearest mineral field
+const Unit* BasicSc2Bot::FindNearestMineralField(const Point2D& start) {
+    const ObservationInterface* observation = Observation();
+    const Unit* nearest_mineral = nullptr;
+    float min_distance = std::numeric_limits<float>::max();
+
+    for (const auto& unit : observation->GetUnits()) {
+        if (unit->unit_type == UNIT_TYPEID::NEUTRAL_MINERALFIELD) {
+            float distance = DistanceSquared2D(unit->pos, start);
+            if (distance < min_distance) {
+                min_distance = distance;
+                nearest_mineral = unit;
+            }
+        }
+    }
+    return nearest_mineral;
 }
 
 
@@ -37,9 +98,10 @@ void BasicSc2Bot::OnStep() {
         enemy_base_location = FindEnemyBase();
     } else if (CountUnitType(UNIT_TYPEID::ZERG_ZERGLING) >= 30) {
         AttackWithZerglings(enemy_base_location);
-    } else{
-		RetreatScouters();
-	}
+    } 
+	//else{
+	//	RetreatScouters();
+	//}
 
 	// Spawn more overlord if we are at the cap
 	if (observation->GetFoodUsed() == observation->GetFoodCap()){
@@ -307,21 +369,17 @@ const Unit *BasicSc2Bot::FindNearestLarva() {
 }
 
 const Unit *BasicSc2Bot::FindAvailableDrone() {
-	const ObservationInterface *observation = Observation();
-	Units units = observation->GetUnits(Unit::Alliance::Self);
-
-	for (const auto &unit : units) {
-		if (unit->unit_type == UNIT_TYPEID::ZERG_DRONE && !unit->orders.empty()) {
-			// Ensure the drone's last order is to gather resources
-			const auto &last_order = unit->orders.back();
-			const Unit* target_unit = observation->GetUnit(last_order.target_unit_tag);
-			if (last_order.ability_id == ABILITY_ID::HARVEST_GATHER && target_unit->unit_type == UNIT_TYPEID::NEUTRAL_MINERALFIELD) {
-				Actions()->UnitCommand(unit, ABILITY_ID::STOP);
-				return unit;
-			}
-		}
-	}
-	return nullptr;
+    const ObservationInterface *observation = Observation();
+    Units units = observation->GetUnits(Unit::Alliance::Self);
+    
+    for (const auto &unit : units) {
+        if (unit->unit_type == UNIT_TYPEID::ZERG_DRONE) {
+            // Force the first drone to stop mining and scout
+            Actions()->UnitCommand(unit, ABILITY_ID::STOP);
+            return unit;
+        }
+    }
+    return nullptr;
 }
 
 int BasicSc2Bot::CountUnitType(UNIT_TYPEID unit_type) {
@@ -369,41 +427,38 @@ void BasicSc2Bot::AttackWithZerglings(Point2D target) {
     }
 }
 
-// For later scouting use
-Point2D BasicSc2Bot::FindEnemyBase() {
-    for (const auto& enemy_struct : Observation()->GetUnits(Unit::Alliance::Enemy)) {
+// Scout Drone Management
+void BasicSc2Bot::RetreatScouters() {
+	Units scout_drones = Observation()->GetUnits(Unit::Alliance::Self, [&](const Unit& unit) {
+		return unit.unit_type == UNIT_TYPEID::ZERG_DRONE && 
+			   !unit.orders.empty() && 
+			   unit.orders[0].ability_id == ABILITY_ID::MOVE_MOVE;
+	});
 
+    for (const auto& scout_drone : scout_drones) {
+        // If scout drone is in danger or spotted, retreat to start location
+        Point2D retreat_position = Observation()->GetStartLocation();
+        Actions()->UnitCommand(scout_drone, ABILITY_ID::MOVE_MOVE, retreat_position);
+    }
+}
+
+Point2D BasicSc2Bot::FindEnemyBase() {
+    // Existing enemy base finding logic
+    for (const auto& enemy_struct : Observation()->GetUnits(Unit::Alliance::Enemy)) {
         if (enemy_struct->unit_type == UNIT_TYPEID::ZERG_HATCHERY || 
             enemy_struct->unit_type == UNIT_TYPEID::PROTOSS_NEXUS || 
             enemy_struct->unit_type == UNIT_TYPEID::TERRAN_COMMANDCENTER) {
             return enemy_struct->pos;
         }
 
-	// Check for enemy units (combat units like Zerglings, Marines, etc.)
-    for (const auto& enemy_unit : Observation()->GetUnits(Unit::Alliance::Enemy)) {
-        if (enemy_unit->unit_type == UNIT_TYPEID::ZERG_ZERGLING || 
-            enemy_unit->unit_type == UNIT_TYPEID::TERRAN_MARINE || 
-            enemy_unit->unit_type == UNIT_TYPEID::PROTOSS_ZEALOT) {
-            return enemy_unit->pos; // Found an enemy unit
+        // Check for enemy units (combat units like Zerglings, Marines, etc.)
+        for (const auto& enemy_unit : Observation()->GetUnits(Unit::Alliance::Enemy)) {
+            if (enemy_unit->unit_type == UNIT_TYPEID::ZERG_ZERGLING || 
+                enemy_unit->unit_type == UNIT_TYPEID::TERRAN_MARINE || 
+                enemy_unit->unit_type == UNIT_TYPEID::PROTOSS_ZEALOT) {
+                return enemy_unit->pos; // Found an enemy unit
+            }
         }
     }
-    }
     return Point2D(-1, -1);
-}
-
-// Method to detect if an Overlord sees enemy units/structures and commands retreat.
-void BasicSc2Bot::RetreatScouters() {
-	auto overlords = Observation()->GetUnits([&](const Unit& unit) {
-            return unit.unit_type == UNIT_TYPEID::ZERG_OVERLORD && unit.alliance == Unit::Alliance::Self;
-    });
-	int count = 1;
-	for (const auto& overlord : overlords) {
-		const ObservationInterface* observation = Observation();
-
-		// Command the Overlord to retreat to a safe location.
-		Point2D retreat_position = observation->GetStartLocation();
-
-		Actions()->UnitCommand(overlord, ABILITY_ID::MOVE_MOVE, retreat_position);
-
-	}
 }
