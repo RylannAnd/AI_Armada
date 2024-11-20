@@ -36,7 +36,7 @@ void BasicSc2Bot::OnStep() {
 	}
 
 	if (CountUnitType(UNIT_TYPEID::ZERG_ZERGLING) < 8) {
-		TryBuildZergling();
+		// TryBuildZergling();
 	}
 
 	static bool spawn_pool = true;
@@ -61,22 +61,18 @@ void BasicSc2Bot::OnStep() {
 			TryBuildHatcheryInNatural();
 			expand = false;
 		}
+
+		if (CountUnitType(UNIT_TYPEID::ZERG_QUEEN) < 2 && observation->GetMinerals() >= 150 && expand == false) {
+			TryBuildQueen();
+		}
+
+		if (CountUnitType(UNIT_TYPEID::ZERG_QUEEN) > 0) {
+			if (TryInject()) {
+				std::cout << "Injecting" << std::endl;
+			}
+		}
 	}
 }
-
-//  void BasicSc2Bot::OnUnitIdle(const Unit* unit) {
-//     switch (unit->unit_type.ToType()) {
-//         case UNIT_TYPEID::ZERG_DRONE: {
-//             // This is where the newly spawned Drone would be detected as
-//             idle.
-//             // Override its default behavior to keep it idle.
-//             Actions()->UnitCommand(unit, ABILITY_ID::STOP);
-//             break;
-//         }
-//         default:
-//             break;
-//     }
-// }
 
 // CORE BUILDINGS / HARVESTING
 // =================================================================================================
@@ -96,7 +92,7 @@ bool BasicSc2Bot::TryBuildSpawningPool() {
 		if (builder_drone) {
 			// Define a list of potential nearby build locations
 			std::vector<Point2D> build_locations = {
-				my_base + Point2D(5, 5),	// Bottom Right
+				my_base + Point2D(5, 5),  // Bottom Right
 				my_base + Point2D(-5, 5), // Bottom Left
 				my_base + Point2D(5, -5), // Top Right
 				my_base + Point2D(-5, -5) // Top Left
@@ -210,7 +206,25 @@ bool BasicSc2Bot::TrySpawnOverlord() {
 }
 
 bool BasicSc2Bot::TryBuildQueen() {
-	return true;
+	const ObservationInterface *observation = Observation();
+
+	// Check if enough minerals are available for a Queen.
+	if (observation->GetMinerals() >= 150) {
+		for (const auto &unit : observation->GetUnits(Unit::Alliance::Self)) {
+			if (unit->unit_type == UNIT_TYPEID::ZERG_HATCHERY ||
+				unit->unit_type == UNIT_TYPEID::ZERG_LAIR ||
+				unit->unit_type == UNIT_TYPEID::ZERG_HIVE) {
+				
+				if (!unit->orders.empty()) {
+					Actions()->UnitCommand(unit, ABILITY_ID::STOP);
+				}
+				
+				Actions()->UnitCommand(unit, ABILITY_ID::TRAIN_QUEEN);
+				return true;
+			}
+		}
+	}
+	return false; // Not enough minerals or no eligible Hatchery/Lair/Hive found.
 }
 
 // FIND UNITS
@@ -310,4 +324,49 @@ Point2D BasicSc2Bot::FindEnemyBase() {
 		}
 	}
 	return Point2D(0, 0);
+}
+
+bool BasicSc2Bot::TryInject() {
+	const ObservationInterface *observation = Observation();
+
+	// Iterate through all Hatcheries and Lairs
+	for (const auto &unit : observation->GetUnits(Unit::Alliance::Self)) {
+		if (unit->unit_type == UNIT_TYPEID::ZERG_HATCHERY ||
+			unit->unit_type == UNIT_TYPEID::ZERG_LAIR) {
+
+			// Check if the Hatchery is eligible for an injection.
+			bool alreadyInjected = false;
+			for (const auto &order : unit->orders) {
+				if (order.ability_id == ABILITY_ID::EFFECT_INJECTLARVA) {
+					alreadyInjected = true;
+					break;
+				}
+			}
+
+			if (!alreadyInjected) {
+				// Find a Queen close to this Hatchery.
+				const Unit *queen = nullptr;
+				float closestDistance = std::numeric_limits<float>::max();
+
+				for (const auto &unitQueen : observation->GetUnits(Unit::Alliance::Self)) {
+					if (unitQueen->unit_type == UNIT_TYPEID::ZERG_QUEEN &&
+						unitQueen->energy >= 25) { // Queens need at least 25 energy to inject.
+						float distance = Distance2D(unit->pos, unitQueen->pos);
+						if (distance < closestDistance) {
+							closestDistance = distance;
+							queen = unitQueen;
+						}
+					}
+				}
+
+				if (queen) {
+					// Command the Queen to inject the Hatchery.
+					Actions()->UnitCommand(queen, ABILITY_ID::EFFECT_INJECTLARVA, unit);
+					return true; // Successfully injected one Hatchery.
+				}
+			}
+		}
+	}
+
+	return false; // No eligible Hatchery or available Queen found.
 }
