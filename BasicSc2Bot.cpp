@@ -43,29 +43,34 @@ void BasicSc2Bot::OnStep() {
 	static bool extractor = true;
 	static bool expand = true;
 
-	if (observation->GetFoodUsed() >= 17) {
+	if (observation->GetFoodUsed() >= 17) {						// rush phase
+		// Build Extractor
 		if (extractor && observation->GetMinerals() >= 25) {
 			std::cout << "building extractor" << std::endl;
 			TryBuildExtractor();
 			extractor = false;
 		}
 
+		// Build Spawning Pool
 		if (spawn_pool && observation->GetMinerals() >= 200) {
 			std::cout << "building pool" << std::endl;
 			TryBuildSpawningPool();
 			spawn_pool = false;
 		}
 
+		// Build Hatchery in Natural Expansion
 		if (expand && observation->GetMinerals() >= 300) {
 			std::cout << "expanding" << std::endl;
 			TryBuildHatcheryInNatural();
 			expand = false;
 		}
 
+		// Make Queens
 		if (CountUnitType(UNIT_TYPEID::ZERG_QUEEN) < 2 && observation->GetMinerals() >= 150 && expand == false) {
 			TryBuildQueen();
 		}
 
+		// Do Injections for extra larvae
 		if (CountUnitType(UNIT_TYPEID::ZERG_QUEEN) > 0) {
 			if (TryInject()) {
 				std::cout << "Injecting" << std::endl;
@@ -176,20 +181,32 @@ bool BasicSc2Bot::TryBuildZergling() {
 }
 
 bool BasicSc2Bot::TryBuildDrone() {
-	const ObservationInterface *observation = Observation();
+    const ObservationInterface* observation = Observation();
 
-	// Build a drone when we have two overlord
-	if (observation->GetMinerals() >= 50 && observation->GetFoodUsed() <= 17 && CountUnitType(UNIT_TYPEID::ZERG_DRONE) < 17) {
-		// Find a larva to morph into a Drone.
-		const Unit *larva = FindNearestLarva();
-		if (larva) {
-			Actions()->UnitCommand(larva, ABILITY_ID::TRAIN_DRONE);
-			// Actions()->UnitCommand(unit, ABILITY_ID::STOP);
-			return true;
-		}
-	}
-	return false;
+    // Check if we have enough resources to build a drone.
+    if (observation->GetMinerals() >= 50) {
+        // Iterate through all Hatcheries, Lairs, and Hives to find larvae.
+        for (const auto& hatchery : observation->GetUnits(Unit::Alliance::Self)) {
+            if (hatchery->unit_type == UNIT_TYPEID::ZERG_HATCHERY ||
+                hatchery->unit_type == UNIT_TYPEID::ZERG_LAIR ||
+                hatchery->unit_type == UNIT_TYPEID::ZERG_HIVE) {
+
+                // Check if there are available larvae at this Hatchery.
+                for (const auto& larva : observation->GetUnits(Unit::Alliance::Self)) {
+                    if (larva->unit_type == UNIT_TYPEID::ZERG_LARVA &&
+                        Distance2D(hatchery->pos, larva->pos) < 10.0f) { // Ensure larva belongs to this Hatchery.
+
+                        // Command the larva to morph into a Drone.
+                        Actions()->UnitCommand(larva, ABILITY_ID::TRAIN_DRONE);
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+    return false; // Not enough resources or no available larva found.
 }
+
 
 bool BasicSc2Bot::TrySpawnOverlord() {
 	const ObservationInterface *observation = Observation();
