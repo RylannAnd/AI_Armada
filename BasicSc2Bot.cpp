@@ -44,27 +44,31 @@ void BasicSc2Bot::OnStep() {
 
 	if (observation->GetFoodUsed() >= 17) {
 		if (create_extractor && observation->GetMinerals() >= 25) {
-			std::cout << "building extractor" << std::endl;
-			TryBuildExtractor();
-			create_extractor = false;
+			if (TryBuildExtractor()) {
+				create_extractor = false;
+				std::cout << "building extractor" << std::endl;
+			}
 		}
 
 		// Build Spawning Pool
 		if (spawn_pool && observation->GetMinerals() >= 200) {
-			std::cout << "building pool" << std::endl;
-			TryBuildSpawningPool();
-			spawn_pool = false;
+			if (TryBuildSpawningPool()) {
+				spawn_pool = false;
+				std::cout << "building pool" << std::endl;
+			}
 		}
 
 		// Build Hatchery in Natural Expansion
 		if (expand && observation->GetMinerals() >= 300) {
-			std::cout << "expanding" << std::endl;
-			TryBuildHatcheryInNatural();
-			expand = false;
+			if (TryBuildHatcheryInNatural()) {
+				expand = false;
+				std::cout << "expanding" << std::endl;
+			}
+			
 		}
 
 		// morph lair
-		if (CountUnitType(UNIT_TYPEID::ZERG_LAIR) < 1){
+		if (CountUnitType(UNIT_TYPEID::ZERG_LAIR) < 1 && expand == false){
 			TryBuildUnit(ABILITY_ID::MORPH_LAIR,UNIT_TYPEID::ZERG_HATCHERY);
 		}
 
@@ -73,7 +77,7 @@ void BasicSc2Bot::OnStep() {
 			TryBuildQueen();
 		}
 
-		
+		// extractor workers
 		if (CountUnitType(UNIT_TYPEID::ZERG_EXTRACTOR) > 0 && expand == false) {
 			AssignExtractorWorkers();
 		}
@@ -357,7 +361,7 @@ const Unit *BasicSc2Bot::FindAvailableDrone() {
 			// Ensure the drone's last order is to gather resources
 			const auto &last_order = unit->orders.back();
 			if (last_order.ability_id == ABILITY_ID::HARVEST_GATHER) {
-				// Actions()->UnitCommand(unit, ABILITY_ID::STOP);
+				Actions()->UnitCommand(unit, ABILITY_ID::STOP);
 				return unit;
 			}
 		}
