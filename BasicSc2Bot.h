@@ -13,10 +13,18 @@ class BasicSc2Bot : public sc2::Agent {
 public:
 	virtual void OnGameStart();
 	virtual void OnStep();
-    // virtual void OnUnitIdle(const Unit* unit);
+    virtual void OnUnitIdle(const Unit* unit);
+
 
 private:
+    std::vector<Point2D> possible_enemy_locations;
+    size_t current_scout_index = 0;
+    Point2D enemy_base_location = Point2D(-1, -1);
+    int num_zergling_upgrades = 0;
+    bool building_pit = false;
+
     bool TryBuildDrone();
+
     bool TrySpawnOverlord();
     bool TryBuildHatcheryInNatural();
     bool TryBuildSpawningPool();
@@ -30,6 +38,7 @@ private:
 
     bool TryBuildStructure(AbilityID ability_type_for_structure, UnitTypeID unit_type); 
     bool TryBuildUnit(AbilityID ability_type_for_unit, UnitTypeID unit_type);
+    void RetreatScouters();
 
     const Unit* FindNearestLarva();
     const Unit* FindAvailableDrone();
@@ -51,6 +60,10 @@ private:
     // data
     std::vector<Point2D> structures;
     int structure_target = 0;
+    const Unit* FindNearestMineralField(const Point2D& start);
+    const Unit* FindNearestTownHall(const Point2D& start);
+    
+
 };
 
 
