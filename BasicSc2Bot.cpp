@@ -3,7 +3,6 @@
 #include "cpp-sc2/include/sc2api/sc2_typeenums.h"
 #include "cpp-sc2/include/sc2lib/sc2_search.h"
 #include <cmath>
-#include <cstddef>
 #include <iostream>
 #include <sc2api/sc2_interfaces.h>
 #include <sc2api/sc2_map_info.h>
@@ -15,14 +14,6 @@ void BasicSc2Bot::OnGameStart() { return; }
 // ./BasicSc2Bot.exe -c -a zerg -d Hard -m CactusValleyLE.SC2Map
 void BasicSc2Bot::OnStep() {
 	const ObservationInterface *observation = Observation();
-
-    TryBuildZergling();
-
-
-    // ATTACKING LOGIC
-	// =================================================================================================
-    AttackWithZerglings();
-	// =================================================================================================
 
 	static int overlord_count = 0;
 	int required_overlords = (observation->GetFoodUsed() + 8) / 8;
@@ -40,7 +31,6 @@ void BasicSc2Bot::OnStep() {
 	static bool create_extractor = true;
 	static bool expand = true;
 	static int num_zergling_upgrades = 0;
-
 
 	if (observation->GetFoodUsed() >= 17) {
 		if (create_extractor && observation->GetMinerals() >= 25) {
@@ -64,30 +54,36 @@ void BasicSc2Bot::OnStep() {
 				expand = false;
 				std::cout << "expanding" << std::endl;
 			}
-			
 		}
+	}
+
+	// ATTACKING LOGIC
+	// =================================================================================================
+	if (!expand) { // execute attacks and upgrades after expanding
+		TryBuildZergling();
+		AttackWithZerglings();
+		// =================================================================================================
 
 		// morph lair
-		if (CountUnitType(UNIT_TYPEID::ZERG_LAIR) < 1 && expand == false){
-			TryBuildUnit(ABILITY_ID::MORPH_LAIR,UNIT_TYPEID::ZERG_HATCHERY);
+		if (CountUnitType(UNIT_TYPEID::ZERG_LAIR) < 1) {
+			TryBuildUnit(ABILITY_ID::MORPH_LAIR, UNIT_TYPEID::ZERG_HATCHERY);
 		}
 
-		// Make Queens 
+		// Make Queens
 		if (CountUnitType(UNIT_TYPEID::ZERG_LAIR) > 0 && CountUnitType(UNIT_TYPEID::ZERG_QUEEN) < 2 && observation->GetMinerals() >= 150 && expand == false) {
 			TryBuildQueen();
 		}
 
 		// extractor workers
-		if (CountUnitType(UNIT_TYPEID::ZERG_EXTRACTOR) > 0 && expand == false) {
-			AssignExtractorWorkers();
+		if (CountUnitType(UNIT_TYPEID::ZERG_EXTRACTOR) > 0) {
+			// AssignExtractorWorkers();
 		}
 
-
-		if (CountUnitType(UNIT_TYPEID::ZERG_INFESTATIONPIT) < 1){
+		if (CountUnitType(UNIT_TYPEID::ZERG_INFESTATIONPIT) < 1) {
 			TryBuildStructure(ABILITY_ID::BUILD_INFESTATIONPIT, UNIT_TYPEID::ZERG_DRONE);
 		}
 
-		if (CountUnitType(UNIT_TYPEID::ZERG_HIVE) < 1){
+		if (CountUnitType(UNIT_TYPEID::ZERG_HIVE) < 1) {
 			TryBuildUnit(ABILITY_ID::MORPH_HIVE, UNIT_TYPEID::ZERG_LAIR);
 		}
 
@@ -104,23 +100,21 @@ void BasicSc2Bot::OnStep() {
 				num_zergling_upgrades++;
 			} else {
 				TryBuildUnit(ABILITY_ID::RESEARCH_ZERGLINGMETABOLICBOOST, UNIT_TYPEID::ZERG_SPAWNINGPOOL);
-				
 			}
-		}else if (num_zergling_upgrades == 1) {
+		} else if (num_zergling_upgrades == 1) {
 			TryBuildUnit(ABILITY_ID::RESEARCH_ZERGLINGADRENALGLANDS, UNIT_TYPEID::ZERG_SPAWNINGPOOL);
 		}
-		
 	}
 }
 
-void BasicSc2Bot::AssignExtractorWorkers(){
+void BasicSc2Bot::AssignExtractorWorkers() {
 	Units extractors = Observation()->GetUnits(Unit::Self, IsUnit(UNIT_TYPEID::ZERG_EXTRACTOR));
-		const Unit* extractor = extractors[0];
-		
-		if (extractor->assigned_harvesters < 3){
-			const Unit* unit = FindAvailableDrone();	
-			Actions()->UnitCommand(unit, ABILITY_ID::HARVEST_GATHER, extractor);
-		}
+	const Unit *extractor = extractors[0];
+
+	if (extractor->assigned_harvesters < 3) {
+		const Unit *unit = FindAvailableDrone();
+		Actions()->UnitCommand(unit, ABILITY_ID::HARVEST_GATHER, extractor);
+	}
 }
 
 // CORE BUILDINGS / HARVESTING
@@ -167,8 +161,6 @@ bool BasicSc2Bot::TryBuildExtractor() {
 		const Unit *builder_drone = FindAvailableDrone();
 		if (geyser && builder_drone) {
 			Actions()->UnitCommand(builder_drone, ABILITY_ID::BUILD_EXTRACTOR, geyser);
-			// const Unit *gas_drone = FindAvailableDrone();
-			//
 			return true;
 		}
 	}
@@ -182,17 +174,6 @@ bool BasicSc2Bot::TryBuildHatcheryInNatural() {
 		return false;
 	}
 
-	// get position of main hatchery as reference
-	const Unit *main_hatchery;
-	for (const auto &unit : observation->GetUnits()) {
-		if (unit->unit_type == UNIT_TYPEID::ZERG_HATCHERY && unit->alliance == Unit::Alliance::Self) {
-			main_hatchery = unit;
-			break;
-		}
-	}
-	if (!main_hatchery) {
-		return false;
-	}
 	Point2D my_base = observation->GetStartLocation();
 	Point2D natural_expansion_pos = FindNaturalExpansionLocation(my_base);
 
@@ -225,7 +206,7 @@ bool BasicSc2Bot::TryBuildZergling() {
 }
 
 bool BasicSc2Bot::TryBuildDrone() {
-    const ObservationInterface* observation = Observation();
+	const ObservationInterface *observation = Observation();
 
 	// Build a drone when we have two overlord
 	if (observation->GetMinerals() >= 50 && observation->GetFoodUsed() <= 20 && CountUnitType(UNIT_TYPEID::ZERG_DRONE) < 20) {
@@ -239,7 +220,6 @@ bool BasicSc2Bot::TryBuildDrone() {
 	}
 	return false;
 }
-
 
 bool BasicSc2Bot::TrySpawnOverlord() {
 	const ObservationInterface *observation = Observation();
@@ -264,11 +244,11 @@ bool BasicSc2Bot::TryBuildQueen() {
 			if (unit->unit_type == UNIT_TYPEID::ZERG_HATCHERY ||
 				unit->unit_type == UNIT_TYPEID::ZERG_LAIR ||
 				unit->unit_type == UNIT_TYPEID::ZERG_HIVE) {
-				
+
 				if (!unit->orders.empty()) {
 					Actions()->UnitCommand(unit, ABILITY_ID::STOP);
 				}
-				
+
 				Actions()->UnitCommand(unit, ABILITY_ID::TRAIN_QUEEN);
 				return true;
 			}
@@ -277,67 +257,65 @@ bool BasicSc2Bot::TryBuildQueen() {
 	return false; // Not enough minerals or no eligible Hatchery/Lair/Hive found.
 }
 
-
-bool BasicSc2Bot::GetRandomUnit(const Unit*& unit_out, const ObservationInterface* observation, UnitTypeID unit_type) {
-    Units my_units = observation->GetUnits(Unit::Alliance::Self);
-    // std::random_shuffle(my_units.begin(), my_units.end()); // Doesn't work, or doesn't work well.
-    for (const auto unit : my_units) {
-        if (unit->unit_type == unit_type) {
-            unit_out = unit;
-            return true;
-        }
-    }
-    return false;
+bool BasicSc2Bot::GetRandomUnit(const Unit *&unit_out, const ObservationInterface *observation, UnitTypeID unit_type) {
+	Units my_units = observation->GetUnits(Unit::Alliance::Self);
+	// std::random_shuffle(my_units.begin(), my_units.end()); // Doesn't work, or doesn't work well.
+	for (const auto unit : my_units) {
+		if (unit->unit_type == unit_type) {
+			unit_out = unit;
+			return true;
+		}
+	}
+	return false;
 }
 
-
 bool BasicSc2Bot::TryBuildStructure(AbilityID ability_type_for_structure, UnitTypeID unit_type) {
-    const ObservationInterface* observation = Observation();
+	const ObservationInterface *observation = Observation();
 
-    // If a unit already is building a supply structure of this type, do nothing.
-    Units units = observation->GetUnits(Unit::Alliance::Self);
-    for (const auto& unit : units) {
-        for (const auto& order : unit->orders) {
-            if (order.ability_id == ability_type_for_structure) {
-                return false;
-            }
-        }
-    }
-
-    // Just try a random location near the unit.
-    const Unit* unit = nullptr;
-    if (!GetRandomUnit(unit, observation, unit_type)){
-        return false;
+	// If a unit already is building a supply structure of this type, do nothing.
+	Units units = observation->GetUnits(Unit::Alliance::Self);
+	for (const auto &unit : units) {
+		for (const auto &order : unit->orders) {
+			if (order.ability_id == ability_type_for_structure) {
+				return false;
+			}
+		}
 	}
 
-    float rx = GetRandomScalar();
-    float ry = GetRandomScalar();
+	// Just try a random location near the unit.
+	const Unit *unit = nullptr;
+	if (!GetRandomUnit(unit, observation, unit_type)) {
+		return false;
+	}
 
-    Actions()->UnitCommand(unit, ability_type_for_structure, unit->pos + Point2D(rx, ry) * 9.0f);
-    return true;
+	float rx = GetRandomScalar();
+	float ry = GetRandomScalar();
+
+	Actions()->UnitCommand(unit, ability_type_for_structure, unit->pos + Point2D(rx, ry) * 9.0f);
+	return true;
 }
 
 bool BasicSc2Bot::TryBuildUnit(AbilityID ability_type_for_unit, UnitTypeID unit_type) {
-    const ObservationInterface* observation = Observation();
+	const ObservationInterface *observation = Observation();
 
-    //If we are at supply cap, don't build anymore units, unless its an overlord.
-    if (observation->GetFoodUsed() >= observation->GetFoodCap() && ability_type_for_unit != ABILITY_ID::TRAIN_OVERLORD) {
-        return false;
-    }
-    const Unit* unit = nullptr;
-    if (!GetRandomUnit(unit, observation, unit_type)) {
-        return false;
-    }
-    if (!unit->orders.empty()) {
-        return false;
-    }
+	// If we are at supply cap, don't build anymore units, unless its an overlord.
+	if (observation->GetFoodUsed() >= observation->GetFoodCap() && ability_type_for_unit != ABILITY_ID::TRAIN_OVERLORD) {
+		return false;
+	}
+	const Unit *unit = nullptr;
+	if (!GetRandomUnit(unit, observation, unit_type)) {
+		return false;
+	}
+	if (!unit->orders.empty()) {
+		return false;
+	}
 
-    if (unit->build_progress != 1) {
-        return false;
-    }
+	if (unit->build_progress != 1) {
+		return false;
+	}
 
-    Actions()->UnitCommand(unit, ability_type_for_unit);
-    return true;
+	Actions()->UnitCommand(unit, ability_type_for_unit);
+	return true;
 }
 
 // FIND UNITS
@@ -417,9 +395,9 @@ Point2D BasicSc2Bot::FindNaturalExpansionLocation(const Point2D &main_hatchery_p
 // ======================================================================================================================
 
 void BasicSc2Bot::AttackWithZerglings() {
-    auto zerglings = Observation()->GetUnits([&](const Unit& unit) {
-            return unit.unit_type == UNIT_TYPEID::ZERG_ZERGLING && unit.alliance == Unit::Alliance::Self;
-    });
+	auto zerglings = Observation()->GetUnits([&](const Unit &unit) {
+		return unit.unit_type == UNIT_TYPEID::ZERG_ZERGLING && unit.alliance == Unit::Alliance::Self;
+	});
 
 	// if enough zerglings
 	if (zerglings.size() >= 12) {
@@ -428,8 +406,7 @@ void BasicSc2Bot::AttackWithZerglings() {
 		// if no enemies in sight
 		if (target == Point2D(-1, -1)) {
 			// If enemy structures have been found
-			if (structure_target < structures.size())
-			{
+			if (structure_target < structures.size()) {
 				Point2D next_structure = structures[structure_target];
 
 				// If at that structure and no structure is there, move to next target index
@@ -444,7 +421,7 @@ void BasicSc2Bot::AttackWithZerglings() {
 
 		// if target has been found
 		if (target != Point2D(-1, -1)) {
-			for (auto& zergling : zerglings) {
+			for (auto &zergling : zerglings) {
 				// Check if the Zergling is already moving to the target
 				if (zergling->orders.empty() || zergling->orders.front().ability_id != ABILITY_ID::ATTACK) {
 					// Issue the attack command to the target
@@ -501,21 +478,21 @@ bool BasicSc2Bot::TryInject() {
 }
 
 // Determine the damage of a unit
-double BasicSc2Bot::FindDamage (const UnitTypeData unit_data) {
+double BasicSc2Bot::FindDamage(const UnitTypeData unit_data) {
 	double damage = 0;
-	for (const auto& weapon : unit_data.weapons) {
-    	 damage += weapon.damage_;
-    }
+	for (const auto &weapon : unit_data.weapons) {
+		damage += weapon.damage_;
+	}
 	return damage;
 }
 
 // Determine if a unit is a structure
-bool BasicSc2Bot::IsStructure (const UnitTypeData unit_data) {
-	for (const auto& attribute : unit_data.attributes) {
+bool BasicSc2Bot::IsStructure(const UnitTypeData unit_data) {
+	for (const auto &attribute : unit_data.attributes) {
 		if (attribute == sc2::Attribute::Structure) {
 			return true;
 		}
-    }
+	}
 	return false;
 }
 
@@ -523,10 +500,10 @@ bool BasicSc2Bot::IsStructure (const UnitTypeData unit_data) {
 Point2D BasicSc2Bot::SeeEnemy() {
 	Point2D best_target = Point2D(-1, -1);
 	double most_damage = -INFINITY;
-	
+
 	// Look at all visable all Units
-    for (const auto& enemy : Observation()->GetUnits(Unit::Alliance::Enemy)) {
-		const auto& unit_info = Observation()->GetUnitTypeData().at(enemy->unit_type);
+	for (const auto &enemy : Observation()->GetUnits(Unit::Alliance::Enemy)) {
+		const auto &unit_info = Observation()->GetUnitTypeData().at(enemy->unit_type);
 		if (IsStructure(unit_info)) {
 			// Add Structure to
 			structures.push_back(enemy->pos);
@@ -538,7 +515,7 @@ Point2D BasicSc2Bot::SeeEnemy() {
 				best_target = enemy->pos;
 			}
 		}
-    }
+	}
 
-    return best_target;
+	return best_target;
 }
