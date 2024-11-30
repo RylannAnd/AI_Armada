@@ -72,6 +72,7 @@ void BasicSc2Bot::OnStep() {
 	static bool create_extractor = true;
 	static bool expand = true;
 	static int num_zergling_upgrades = 0;
+	static int gas_workers = 0;
 
 	// Every extra drone spawned at setup phase will go through building core buildings
 	if (observation->GetFoodUsed() >= 17 && expand) {
@@ -100,15 +101,16 @@ void BasicSc2Bot::OnStep() {
 	}
 
 	// When Extractor is made
-	if (!create_extractor) {
+	if (CountUnitType(UNIT_TYPEID::ZERG_EXTRACTOR) > 1 && gas_workers < 3) {
 		// extractor workers
-		if (CountUnitType(UNIT_TYPEID::ZERG_EXTRACTOR) > 0) {
+		for (int i = 0; i < 3; i++) {
 			AssignExtractorWorkers();
+			gas_workers++;
 		}
 	}
 
 	// When spawning pool is made
-	if (!spawn_pool) {
+	if (CountUnitType(UNIT_TYPEID::ZERG_SPAWNINGPOOL) > 1) {
 		// Upgrade zergling abilities
 		if (num_zergling_upgrades == 0) {
 			std::vector<UpgradeID> completed_upgrades = observation->GetUpgrades();
@@ -143,7 +145,7 @@ void BasicSc2Bot::OnStep() {
 		TryBuildZergling();
 		AttackWithZerglings();
 	}
-	
+
 	// Check if we're floating on money
 	if (observation->GetMinerals() >= 400) {
 		TryBuildHatcheryInNatural();
@@ -333,7 +335,7 @@ bool BasicSc2Bot::TryBuildQueen() {
 			}
 		}
 	}
-	return false; // Not enough minerals or no eligible Hatchery/Lair/Hive found.
+	return false;
 }
 
 bool BasicSc2Bot::TryBuildUnit(AbilityID ability_type_for_unit, UnitTypeID unit_type) {
@@ -473,36 +475,35 @@ void BasicSc2Bot::AttackWithZerglings() {
 }
 
 void BasicSc2Bot::TryInject() {
-    const ObservationInterface *observation = Observation();
+	const ObservationInterface *observation = Observation();
 
-    // Iterate through all Hatcheries
-    for (const auto &hatchery : observation->GetUnits(Unit::Alliance::Self)) {
-        if (hatchery->unit_type == UNIT_TYPEID::ZERG_HATCHERY) {
+	// Iterate through all Hatcheries
+	for (const auto &hatchery : observation->GetUnits(Unit::Alliance::Self)) {
+		if (hatchery->unit_type == UNIT_TYPEID::ZERG_HATCHERY) {
 
-            // Check if the Hatchery is eligible for an injection
-            bool alreadyInjected = false;
-            for (const auto &order : hatchery->orders) {
-                if (order.ability_id == ABILITY_ID::EFFECT_INJECTLARVA) {
-                    alreadyInjected = true;
-                    break;
-                }
-            }
+			// Check if the Hatchery is eligible for an injection
+			bool alreadyInjected = false;
+			for (const auto &order : hatchery->orders) {
+				if (order.ability_id == ABILITY_ID::EFFECT_INJECTLARVA) {
+					alreadyInjected = true;
+					break;
+				}
+			}
 
-            if (!alreadyInjected) {
-                // Iterate through Queens to find one that can inject
-                for (const auto &queen : observation->GetUnits(Unit::Alliance::Self)) {
-                    if (queen->unit_type == UNIT_TYPEID::ZERG_QUEEN &&
-                        queen->energy >= 25) { // Queens need at least 25 energy to inject
-                        // Command the Queen to inject the Hatchery
-                        Actions()->UnitCommand(queen, ABILITY_ID::EFFECT_INJECTLARVA, hatchery);
-                        break; // Move to the next Hatchery after assigning a Queen
-                    }
-                }
-            }
-        }
-    }
+			if (!alreadyInjected) {
+				// Iterate through Queens to find one that can inject
+				for (const auto &queen : observation->GetUnits(Unit::Alliance::Self)) {
+					if (queen->unit_type == UNIT_TYPEID::ZERG_QUEEN &&
+						queen->energy >= 25) { // Queens need at least 25 energy to inject
+						// Command the Queen to inject the Hatchery
+						Actions()->UnitCommand(queen, ABILITY_ID::EFFECT_INJECTLARVA, hatchery);
+						break; // Move to the next Hatchery after assigning a Queen
+					}
+				}
+			}
+		}
+	}
 }
-
 
 // New helper method to find nearest town hall
 const Unit *BasicSc2Bot::FindNearestTownHall(const Point2D &start) {
