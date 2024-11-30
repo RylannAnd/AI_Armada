@@ -53,6 +53,7 @@ void BasicSc2Bot::OnUnitIdle(const Unit* unit) {
 void BasicSc2Bot::OnStep() {
 	const ObservationInterface *observation = Observation();
 
+	// Spawn overlords as needed
 	static int overlord_count = 0;
 	int required_overlords = (observation->GetFoodUsed() + 8) / 8;
 	if ((observation->GetFoodUsed() >= 13 && overlord_count == 0 && observation->GetMinerals() >= 100) || (overlord_count > 0 && overlord_count < required_overlords)) {
@@ -60,19 +61,20 @@ void BasicSc2Bot::OnStep() {
 		overlord_count++;
 	}
 
+	// Spawn drones as neeeded with initial cap being 20
 	static int drone_cap = 20;
 	if (CountUnitType(UNIT_TYPEID::ZERG_DRONE) < drone_cap) {
 		TryBuildDrone();
 	}
 
-	TryBuildZergling();
-
+	// SETUP PHASE =================================================================================================
 	static bool spawn_pool = true;
 	static bool create_extractor = true;
 	static bool expand = true;
 	static int num_zergling_upgrades = 0;
 
-	if (observation->GetFoodUsed() >= 17) {
+	// Every extra drone spawned at setup phase will go through building core buildings
+	if (observation->GetFoodUsed() >= 17 && expand) {
 		if (create_extractor && observation->GetMinerals() >= 25) {
 			if (TryBuildExtractor()) {
 				create_extractor = false;
@@ -97,10 +99,10 @@ void BasicSc2Bot::OnStep() {
 		}
 	}
 
-	// ATTACKING LOGIC
+	// ATTACKING PHASE =================================================================================================
+	TryBuildZergling();
 	AttackWithZerglings();
 
-	// =================================================================================================
 	if (CountUnitType(UNIT_TYPEID::ZERG_HATCHERY) > 1) { // execute attacks and upgrades after expanding
 
 		// morph lair
@@ -118,13 +120,13 @@ void BasicSc2Bot::OnStep() {
 			AssignExtractorWorkers();
 		}
 
-		if (CountUnitType(UNIT_TYPEID::ZERG_INFESTATIONPIT) < 1) {
-			TryBuildStructure(ABILITY_ID::BUILD_INFESTATIONPIT, UNIT_TYPEID::ZERG_DRONE);
-		}
+		// if (CountUnitType(UNIT_TYPEID::ZERG_INFESTATIONPIT) < 1) {
+		// 	TryBuildStructure(ABILITY_ID::BUILD_INFESTATIONPIT, UNIT_TYPEID::ZERG_DRONE);
+		// }
 
-		if (CountUnitType(UNIT_TYPEID::ZERG_HIVE) < 1) {
-			TryBuildUnit(ABILITY_ID::MORPH_HIVE, UNIT_TYPEID::ZERG_LAIR);
-		}
+		// if (CountUnitType(UNIT_TYPEID::ZERG_HIVE) < 1) {
+		// 	TryBuildUnit(ABILITY_ID::MORPH_HIVE, UNIT_TYPEID::ZERG_LAIR);
+		// }
 
 		// Do Injections for extra larvae after lair is built
 		if (CountUnitType(UNIT_TYPEID::ZERG_QUEEN) > 0) {
@@ -145,103 +147,6 @@ void BasicSc2Bot::OnStep() {
 		}
 	}
 }
-
-
-// void BasicSc2Bot::OnStep() {
-// 	const ObservationInterface *observation = Observation();
-
-//     // TryBuildZergling();
-
-
-//     // // ATTACKING LOGIC
-// 	// // =================================================================================================
-//     // AttackWithZerglings();
-// 	// // =================================================================================================
-
-// 	static int overlord_count = 0;
-// 	int required_overlords = (observation->GetFoodUsed() + 8) / 8;
-// 	if ((observation->GetFoodUsed() >= 13 && overlord_count == 0 && observation->GetMinerals() >= 100) || (overlord_count > 0 && overlord_count < required_overlords)) {
-// 		TrySpawnOverlord();
-// 		overlord_count++;
-// 	}
-
-// 	static int drone_cap = 20;
-// 	if (CountUnitType(UNIT_TYPEID::ZERG_DRONE) < drone_cap) {
-// 		TryBuildDrone();
-// 	}
-
-// 	static bool spawn_pool = true;
-// 	static bool create_extractor = true;
-// 	static bool expand = true;
-// 	static int num_zergling_upgrades = 0;
-
-
-// 	if (observation->GetFoodUsed() >= 17) {
-// 		if (create_extractor && observation->GetMinerals() >= 25) {
-// 			std::cout << "building extractor" << std::endl;
-// 			TryBuildExtractor();
-// 			create_extractor = false;
-// 		}
-
-// 		// Build Spawning Pool
-// 		if (spawn_pool && observation->GetMinerals() >= 200) {
-// 			std::cout << "building pool" << std::endl;
-// 			TryBuildSpawningPool();
-// 			spawn_pool = false;
-// 		}
-
-// 		// Build Hatchery in Natural Expansion
-// 		if (expand && observation->GetMinerals() >= 300) {
-// 			std::cout << "expanding" << std::endl;
-// 			TryBuildHatcheryInNatural();
-// 			expand = false;
-// 		}
-
-// 		// morph lair
-// 		if (CountUnitType(UNIT_TYPEID::ZERG_LAIR) < 1){
-// 			TryBuildUnit(ABILITY_ID::MORPH_LAIR,UNIT_TYPEID::ZERG_HATCHERY);
-// 		}
-
-// 		// Make Queens 
-// 		if (CountUnitType(UNIT_TYPEID::ZERG_LAIR) > 0 && CountUnitType(UNIT_TYPEID::ZERG_QUEEN) < 2 && observation->GetMinerals() >= 150 && expand == false) {
-// 			TryBuildQueen();
-// 		}
-
-		
-// 		if (CountUnitType(UNIT_TYPEID::ZERG_EXTRACTOR) > 0 && expand == false) {
-// 			AssignExtractorWorkers();
-// 		}
-
-
-// 		if (CountUnitType(UNIT_TYPEID::ZERG_INFESTATIONPIT) < 1){
-// 			TryBuildStructure(ABILITY_ID::BUILD_INFESTATIONPIT, UNIT_TYPEID::ZERG_DRONE);
-// 		}
-
-// 		if (CountUnitType(UNIT_TYPEID::ZERG_HIVE) < 1){
-// 			TryBuildUnit(ABILITY_ID::MORPH_HIVE, UNIT_TYPEID::ZERG_LAIR);
-// 		}
-
-// 		// Do Injections for extra larvae after lair is built
-// 		if (CountUnitType(UNIT_TYPEID::ZERG_LAIR) > 0 && CountUnitType(UNIT_TYPEID::ZERG_QUEEN) > 0) {
-// 			TryInject();
-// 		}
-
-// 		// Upgrade zerling abilities
-// 		if (num_zergling_upgrades == 0) {
-// 			std::vector<UpgradeID> completed_upgrades = observation->GetUpgrades();
-
-// 			if (std::find(completed_upgrades.begin(), completed_upgrades.end(), UPGRADE_ID::ZERGLINGMOVEMENTSPEED) != completed_upgrades.end()) {
-// 				num_zergling_upgrades++;
-// 			} else {
-// 				TryBuildUnit(ABILITY_ID::RESEARCH_ZERGLINGMETABOLICBOOST, UNIT_TYPEID::ZERG_SPAWNINGPOOL);
-				
-// 			}
-// 		}else if (num_zergling_upgrades == 1) {
-// 			TryBuildUnit(ABILITY_ID::RESEARCH_ZERGLINGADRENALGLANDS, UNIT_TYPEID::ZERG_SPAWNINGPOOL);
-// 		}
-		
-// 	}
-// }
 
 void BasicSc2Bot::AssignExtractorWorkers(){
 	Units extractors = Observation()->GetUnits(Unit::Self, IsUnit(UNIT_TYPEID::ZERG_EXTRACTOR));
