@@ -462,50 +462,37 @@ void BasicSc2Bot::AttackWithZerglings() {
 	}
 }
 
-bool BasicSc2Bot::TryInject() {
-	const ObservationInterface *observation = Observation();
-	bool injectionPerformed = false; // Track if any injection was performed.
+void BasicSc2Bot::TryInject() {
+    const ObservationInterface *observation = Observation();
 
-	// Iterate through all Hatcheries
-	for (const auto &unit : observation->GetUnits(Unit::Alliance::Self)) {
-		if (unit->unit_type == UNIT_TYPEID::ZERG_HATCHERY) {
+    // Iterate through all Hatcheries
+    for (const auto &hatchery : observation->GetUnits(Unit::Alliance::Self)) {
+        if (hatchery->unit_type == UNIT_TYPEID::ZERG_HATCHERY) {
 
-			// Check if the Hatchery is eligible for an injection.
-			bool alreadyInjected = false;
-			for (const auto &order : unit->orders) {
-				if (order.ability_id == ABILITY_ID::EFFECT_INJECTLARVA) {
-					alreadyInjected = true;
-					break;
-				}
-			}
+            // Check if the Hatchery is eligible for an injection
+            bool alreadyInjected = false;
+            for (const auto &order : hatchery->orders) {
+                if (order.ability_id == ABILITY_ID::EFFECT_INJECTLARVA) {
+                    alreadyInjected = true;
+                    break;
+                }
+            }
 
-			if (!alreadyInjected) {
-				// Find a Queen close to this Hatchery.
-				const Unit *queen = nullptr;
-				float closestDistance = std::numeric_limits<float>::max();
-
-				for (const auto &unitQueen : observation->GetUnits(Unit::Alliance::Self)) {
-					if (unitQueen->unit_type == UNIT_TYPEID::ZERG_QUEEN &&
-						unitQueen->energy >= 25) { // Queens need at least 25 energy to inject.
-						float distance = Distance2D(unit->pos, unitQueen->pos);
-						if (distance < closestDistance) {
-							closestDistance = distance;
-							queen = unitQueen;
-						}
-					}
-				}
-
-				if (queen) {
-					// Command the Queen to inject the Hatchery.
-					Actions()->UnitCommand(queen, ABILITY_ID::EFFECT_INJECTLARVA, unit);
-					injectionPerformed = true; // Mark injection as performed.
-				}
-			}
-		}
-	}
-
-	return injectionPerformed; // Return true if at least one injection was performed.
+            if (!alreadyInjected) {
+                // Iterate through Queens to find one that can inject
+                for (const auto &queen : observation->GetUnits(Unit::Alliance::Self)) {
+                    if (queen->unit_type == UNIT_TYPEID::ZERG_QUEEN &&
+                        queen->energy >= 25) { // Queens need at least 25 energy to inject
+                        // Command the Queen to inject the Hatchery
+                        Actions()->UnitCommand(queen, ABILITY_ID::EFFECT_INJECTLARVA, hatchery);
+                        break; // Move to the next Hatchery after assigning a Queen
+                    }
+                }
+            }
+        }
+    }
 }
+
 
 // New helper method to find nearest town hall
 const Unit *BasicSc2Bot::FindNearestTownHall(const Point2D &start) {
