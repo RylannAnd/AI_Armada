@@ -99,33 +99,17 @@ void BasicSc2Bot::OnStep() {
 		}
 	}
 
-	// ATTACKING PHASE =================================================================================================
-	TryBuildZergling();
-	AttackWithZerglings();
-
-	if (CountUnitType(UNIT_TYPEID::ZERG_HATCHERY) > 1) { // execute attacks and upgrades after expanding
-
-		// morph lair
-		if (CountUnitType(UNIT_TYPEID::ZERG_LAIR) < 1) {
-			TryBuildUnit(ABILITY_ID::MORPH_LAIR, UNIT_TYPEID::ZERG_HATCHERY);
-		}
-
-		// Make Queens
-		if (CountUnitType(UNIT_TYPEID::ZERG_QUEEN) < 2 && observation->GetMinerals() >= 150) {
-			TryBuildQueen();
-		}
-
+	// When Extractor is made
+	if (!create_extractor) {
 		// extractor workers
 		if (CountUnitType(UNIT_TYPEID::ZERG_EXTRACTOR) > 0) {
 			AssignExtractorWorkers();
 		}
+	}
 
-		// Do Injections for extra larvae after lair is built
-		if (CountUnitType(UNIT_TYPEID::ZERG_QUEEN) > 0) {
-			TryInject();
-		}
-
-		// Upgrade zerling abilities
+	// When spawning pool is made
+	if (!spawn_pool) {
+		// Upgrade zergling abilities
 		if (num_zergling_upgrades == 0) {
 			std::vector<UpgradeID> completed_upgrades = observation->GetUpgrades();
 
@@ -134,9 +118,35 @@ void BasicSc2Bot::OnStep() {
 			} else {
 				TryBuildUnit(ABILITY_ID::RESEARCH_ZERGLINGMETABOLICBOOST, UNIT_TYPEID::ZERG_SPAWNINGPOOL);
 			}
-		} else if (num_zergling_upgrades == 1) {
-			TryBuildUnit(ABILITY_ID::RESEARCH_ZERGLINGADRENALGLANDS, UNIT_TYPEID::ZERG_SPAWNINGPOOL);
 		}
+	}
+
+	// When natural expansion done
+	if (CountUnitType(UNIT_TYPEID::ZERG_HATCHERY) > 1) { // execute attacks and upgrades after expanding
+		// Increase drone cap
+		drone_cap = 20;
+
+		// Make Queens
+		if (CountUnitType(UNIT_TYPEID::ZERG_QUEEN) < 2 && observation->GetMinerals() >= 150) {
+			TryBuildQueen();
+		}
+
+		// Do Injections for extra larvae after lair is built
+		if (CountUnitType(UNIT_TYPEID::ZERG_QUEEN) > 0) {
+			TryInject();
+		}
+	}
+
+	// ATTACKING PHASE =================================================================================================
+	// Attack when speed upgrade is done
+	if (num_zergling_upgrades != 0) {
+		TryBuildZergling();
+		AttackWithZerglings();
+	}
+	
+	// Check if we're floating on money
+	if (observation->GetMinerals() >= 400) {
+		TryBuildHatcheryInNatural();
 	}
 }
 
