@@ -12,43 +12,43 @@
 using namespace sc2;
 
 // ./BasicSc2Bot.exe -c -a zerg -d Hard -m CactusValleyLE.SC2Map
-void BasicSc2Bot::OnGameStart() { 
-    const ObservationInterface* observation = Observation();
-    possible_enemy_locations = observation->GetGameInfo().enemy_start_locations;
+void BasicSc2Bot::OnGameStart() {
+	const ObservationInterface *observation = Observation();
+	possible_enemy_locations = observation->GetGameInfo().enemy_start_locations;
 
-    // return nullptr;
-    const Unit* scout_drone = FindAvailableDrone();
-    if (scout_drone && !possible_enemy_locations.empty()) {
-        Actions()->UnitCommand(scout_drone, ABILITY_ID::MOVE_MOVE, possible_enemy_locations[0]);
-        current_scout_index = 1; // Prepare for next location
-    }
+	// return nullptr;
+	const Unit *scout_drone = FindAvailableDrone();
+	if (scout_drone && !possible_enemy_locations.empty()) {
+		Actions()->UnitCommand(scout_drone, ABILITY_ID::MOVE_MOVE, possible_enemy_locations[0]);
+		current_scout_index = 1; // Prepare for next location
+	}
 
-    return;
+	return;
 }
 
-void BasicSc2Bot::OnUnitIdle(const Unit* unit) {
-    // If it's a drone that was scouting
-    if (unit->unit_type == UNIT_TYPEID::ZERG_DRONE) {
-        // Check if we have more locations to scout
-        if (current_scout_index < possible_enemy_locations.size()) {
-            Actions()->UnitCommand(unit, ABILITY_ID::MOVE_MOVE, possible_enemy_locations[current_scout_index]);
-            current_scout_index++;
-        } else {
-            // Find our own base location to return to
-            const Unit* townhall = FindNearestTownHall(unit->pos);
-            if (townhall) {
-                // First move to the base
-                Actions()->UnitCommand(unit, ABILITY_ID::MOVE_MOVE, townhall->pos);
-                
-                // Then find a mineral field to mine
-                const Unit* nearby_mineral = FindNearestMineralField(townhall->pos);
-                if (nearby_mineral) {
-                    // Queue the harvest gather command after moving
-                    Actions()->UnitCommand(unit, ABILITY_ID::HARVEST_GATHER, nearby_mineral);
-                }
-            }
-        }
-    }
+void BasicSc2Bot::OnUnitIdle(const Unit *unit) {
+	// If it's a drone that was scouting
+	if (unit->unit_type == UNIT_TYPEID::ZERG_DRONE) {
+		// Check if we have more locations to scout
+		if (current_scout_index < possible_enemy_locations.size()) {
+			Actions()->UnitCommand(unit, ABILITY_ID::MOVE_MOVE, possible_enemy_locations[current_scout_index]);
+			current_scout_index++;
+		} else {
+			// Find our own base location to return to
+			const Unit *townhall = FindNearestTownHall(unit->pos);
+			if (townhall) {
+				// First move to the base
+				Actions()->UnitCommand(unit, ABILITY_ID::MOVE_MOVE, townhall->pos);
+
+				// Then find a mineral field to mine
+				const Unit *nearby_mineral = FindNearestMineralField(townhall->pos);
+				if (nearby_mineral) {
+					// Queue the harvest gather command after moving
+					Actions()->UnitCommand(unit, ABILITY_ID::HARVEST_GATHER, nearby_mineral);
+				}
+			}
+		}
+	}
 }
 void BasicSc2Bot::OnStep() {
 	const ObservationInterface *observation = Observation();
@@ -120,14 +120,6 @@ void BasicSc2Bot::OnStep() {
 			AssignExtractorWorkers();
 		}
 
-		// if (CountUnitType(UNIT_TYPEID::ZERG_INFESTATIONPIT) < 1) {
-		// 	TryBuildStructure(ABILITY_ID::BUILD_INFESTATIONPIT, UNIT_TYPEID::ZERG_DRONE);
-		// }
-
-		// if (CountUnitType(UNIT_TYPEID::ZERG_HIVE) < 1) {
-		// 	TryBuildUnit(ABILITY_ID::MORPH_HIVE, UNIT_TYPEID::ZERG_LAIR);
-		// }
-
 		// Do Injections for extra larvae after lair is built
 		if (CountUnitType(UNIT_TYPEID::ZERG_QUEEN) > 0) {
 			TryInject();
@@ -145,16 +137,6 @@ void BasicSc2Bot::OnStep() {
 		} else if (num_zergling_upgrades == 1) {
 			TryBuildUnit(ABILITY_ID::RESEARCH_ZERGLINGADRENALGLANDS, UNIT_TYPEID::ZERG_SPAWNINGPOOL);
 		}
-	}
-}
-
-void BasicSc2Bot::AssignExtractorWorkers(){
-	Units extractors = Observation()->GetUnits(Unit::Self, IsUnit(UNIT_TYPEID::ZERG_EXTRACTOR));
-	const Unit *extractor = extractors[0];
-
-	if (extractor->assigned_harvesters < 3) {
-		const Unit *unit = FindAvailableDrone();
-		Actions()->UnitCommand(unit, ABILITY_ID::HARVEST_GATHER, extractor);
 	}
 }
 
@@ -193,47 +175,43 @@ bool BasicSc2Bot::TryBuildSpawningPool() {
 	return false;
 }
 
-
-bool BasicSc2Bot::GetRandomUnit(const Unit*& unit_out, const ObservationInterface* observation, UnitTypeID unit_type) {
-    Units my_units = observation->GetUnits(Unit::Alliance::Self);
-    // std::random_shuffle(my_units.begin(), my_units.end()); // Doesn't work, or doesn't work well.
-    for (const auto unit : my_units) {
-        if (unit->unit_type == unit_type) {
-            unit_out = unit;
-            return true;
-        }
-    }
-    return false;
+bool BasicSc2Bot::GetRandomUnit(const Unit *&unit_out, const ObservationInterface *observation, UnitTypeID unit_type) {
+	Units my_units = observation->GetUnits(Unit::Alliance::Self);
+	// std::random_shuffle(my_units.begin(), my_units.end()); // Doesn't work, or doesn't work well.
+	for (const auto unit : my_units) {
+		if (unit->unit_type == unit_type) {
+			unit_out = unit;
+			return true;
+		}
+	}
+	return false;
 }
-
 
 bool BasicSc2Bot::TryBuildStructure(AbilityID ability_type_for_structure, UnitTypeID unit_type) {
-    const ObservationInterface* observation = Observation();
+	const ObservationInterface *observation = Observation();
 
-    // If a unit already is building a supply structure of this type, do nothing.
-    Units units = observation->GetUnits(Unit::Alliance::Self);
-    for (const auto& unit : units) {
-        for (const auto& order : unit->orders) {
-            if (order.ability_id == ability_type_for_structure) {
-                return false;
-            }
-        }
-    }
-
-    // Just try a random location near the unit.
-    const Unit* unit = nullptr;
-    if (!GetRandomUnit(unit, observation, unit_type)){
-        return false;
+	// If a unit already is building a supply structure of this type, do nothing.
+	Units units = observation->GetUnits(Unit::Alliance::Self);
+	for (const auto &unit : units) {
+		for (const auto &order : unit->orders) {
+			if (order.ability_id == ability_type_for_structure) {
+				return false;
+			}
+		}
 	}
 
-    float rx = GetRandomScalar();
-    float ry = GetRandomScalar();
+	// Just try a random location near the unit.
+	const Unit *unit = nullptr;
+	if (!GetRandomUnit(unit, observation, unit_type)) {
+		return false;
+	}
 
-    Actions()->UnitCommand(unit, ability_type_for_structure, unit->pos + Point2D(rx, ry) * 9.0f);
-    return true;
+	float rx = GetRandomScalar();
+	float ry = GetRandomScalar();
+
+	Actions()->UnitCommand(unit, ability_type_for_structure, unit->pos + Point2D(rx, ry) * 9.0f);
+	return true;
 }
-
-
 
 bool BasicSc2Bot::TryBuildExtractor() {
 	const ObservationInterface *observation = Observation();
@@ -248,6 +226,16 @@ bool BasicSc2Bot::TryBuildExtractor() {
 		}
 	}
 	return false;
+}
+
+void BasicSc2Bot::AssignExtractorWorkers() {
+	Units extractors = Observation()->GetUnits(Unit::Self, IsUnit(UNIT_TYPEID::ZERG_EXTRACTOR));
+	const Unit *extractor = extractors[0];
+
+	if (extractor->assigned_harvesters < 3) {
+		const Unit *unit = FindAvailableDrone();
+		Actions()->UnitCommand(unit, ABILITY_ID::HARVEST_GATHER, extractor);
+	}
 }
 
 bool BasicSc2Bot::TryBuildHatcheryInNatural() {
@@ -324,9 +312,7 @@ bool BasicSc2Bot::TryBuildQueen() {
 	// Check if enough minerals are available for a Queen.
 	if (observation->GetMinerals() >= 150) {
 		for (const auto &unit : observation->GetUnits(Unit::Alliance::Self)) {
-			if (unit->unit_type == UNIT_TYPEID::ZERG_HATCHERY ||
-				unit->unit_type == UNIT_TYPEID::ZERG_LAIR ||
-				unit->unit_type == UNIT_TYPEID::ZERG_HIVE) {
+			if (unit->unit_type == UNIT_TYPEID::ZERG_HATCHERY) {
 
 				if (!unit->orders.empty()) {
 					Actions()->UnitCommand(unit, ABILITY_ID::STOP);
@@ -438,7 +424,6 @@ Point2D BasicSc2Bot::FindNaturalExpansionLocation(const Point2D &main_hatchery_p
 
 // ATTACKING / SCOUTING
 // ======================================================================================================================
-
 void BasicSc2Bot::AttackWithZerglings() {
 	auto zerglings = Observation()->GetUnits([&](const Unit &unit) {
 		return unit.unit_type == UNIT_TYPEID::ZERG_ZERGLING && unit.alliance == Unit::Alliance::Self;
@@ -479,11 +464,11 @@ void BasicSc2Bot::AttackWithZerglings() {
 
 bool BasicSc2Bot::TryInject() {
 	const ObservationInterface *observation = Observation();
+	bool injectionPerformed = false; // Track if any injection was performed.
 
-	// Iterate through all Hatcheries and Lairs
+	// Iterate through all Hatcheries
 	for (const auto &unit : observation->GetUnits(Unit::Alliance::Self)) {
-		if (unit->unit_type == UNIT_TYPEID::ZERG_HATCHERY ||
-			unit->unit_type == UNIT_TYPEID::ZERG_LAIR) {
+		if (unit->unit_type == UNIT_TYPEID::ZERG_HATCHERY) {
 
 			// Check if the Hatchery is eligible for an injection.
 			bool alreadyInjected = false;
@@ -513,54 +498,53 @@ bool BasicSc2Bot::TryInject() {
 				if (queen) {
 					// Command the Queen to inject the Hatchery.
 					Actions()->UnitCommand(queen, ABILITY_ID::EFFECT_INJECTLARVA, unit);
-					return true; // Successfully injected one Hatchery.
+					injectionPerformed = true; // Mark injection as performed.
 				}
 			}
 		}
 	}
 
-	return false; // No eligible Hatchery or available Queen found.
+	return injectionPerformed; // Return true if at least one injection was performed.
 }
 
 // New helper method to find nearest town hall
-const Unit* BasicSc2Bot::FindNearestTownHall(const Point2D& start) {
-    const ObservationInterface* observation = Observation();
-    const Unit* nearest_townhall = nullptr;
-    float min_distance = std::numeric_limits<float>::max();
+const Unit *BasicSc2Bot::FindNearestTownHall(const Point2D &start) {
+	const ObservationInterface *observation = Observation();
+	const Unit *nearest_townhall = nullptr;
+	float min_distance = std::numeric_limits<float>::max();
 
-    for (const auto& unit : observation->GetUnits()) {
-        // Check for Zerg town halls (Hatchery, Lair, Hive)
-        if (unit->unit_type == UNIT_TYPEID::ZERG_HATCHERY || 
-            unit->unit_type == UNIT_TYPEID::ZERG_LAIR || 
-            unit->unit_type == UNIT_TYPEID::ZERG_HIVE) {
-            float distance = DistanceSquared2D(unit->pos, start);
-            if (distance < min_distance) {
-                min_distance = distance;
-                nearest_townhall = unit;
-            }
-        }
-    }
-    return nearest_townhall;
+	for (const auto &unit : observation->GetUnits()) {
+		// Check for Zerg town halls (Hatchery, Lair, Hive)
+		if (unit->unit_type == UNIT_TYPEID::ZERG_HATCHERY ||
+			unit->unit_type == UNIT_TYPEID::ZERG_LAIR ||
+			unit->unit_type == UNIT_TYPEID::ZERG_HIVE) {
+			float distance = DistanceSquared2D(unit->pos, start);
+			if (distance < min_distance) {
+				min_distance = distance;
+				nearest_townhall = unit;
+			}
+		}
+	}
+	return nearest_townhall;
 }
 
 // Helper method to find nearest mineral field
-const Unit* BasicSc2Bot::FindNearestMineralField(const Point2D& start) {
-    const ObservationInterface* observation = Observation();
-    const Unit* nearest_mineral = nullptr;
-    float min_distance = std::numeric_limits<float>::max();
+const Unit *BasicSc2Bot::FindNearestMineralField(const Point2D &start) {
+	const ObservationInterface *observation = Observation();
+	const Unit *nearest_mineral = nullptr;
+	float min_distance = std::numeric_limits<float>::max();
 
-    for (const auto& unit : observation->GetUnits()) {
-        if (unit->unit_type == UNIT_TYPEID::NEUTRAL_MINERALFIELD) {
-            float distance = DistanceSquared2D(unit->pos, start);
-            if (distance < min_distance) {
-                min_distance = distance;
-                nearest_mineral = unit;
-            }
-        }
-    }
-    return nearest_mineral;
+	for (const auto &unit : observation->GetUnits()) {
+		if (unit->unit_type == UNIT_TYPEID::NEUTRAL_MINERALFIELD) {
+			float distance = DistanceSquared2D(unit->pos, start);
+			if (distance < min_distance) {
+				min_distance = distance;
+				nearest_mineral = unit;
+			}
+		}
+	}
+	return nearest_mineral;
 }
-
 
 // Determine the damage of a unit
 double BasicSc2Bot::FindDamage(const UnitTypeData unit_data) {
@@ -602,5 +586,5 @@ Point2D BasicSc2Bot::SeeEnemy() {
 		}
 	}
 
-    return best_target;
+	return best_target;
 }
