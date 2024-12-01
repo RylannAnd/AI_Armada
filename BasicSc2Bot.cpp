@@ -35,7 +35,7 @@ void BasicSc2Bot::OnUnitIdle(const Unit *unit) {
 	// If it's a drone that was scouting
 	if (unit->unit_type == UNIT_TYPEID::ZERG_DRONE) {
 		// Check if we have more locations to scout
-		if (current_scout_index < possible_enemy_locations.size()) {
+		if (structures.empty() && current_scout_index < possible_enemy_locations.size()) {
 			Actions()->UnitCommand(unit, ABILITY_ID::MOVE_MOVE, possible_enemy_locations[current_scout_index]);
 			current_scout_index++;
 		} else {
@@ -57,6 +57,7 @@ void BasicSc2Bot::OnUnitIdle(const Unit *unit) {
 }
 void BasicSc2Bot::OnStep() {
 	const ObservationInterface *observation = Observation();
+	AttackWithZerglings();
 
 	// Spawn overlords as needed
 	static int overlord_count = 0;
@@ -458,13 +459,14 @@ Point2D BasicSc2Bot::FindNaturalExpansionLocation(const Point2D &location, const
 // ATTACKING / SCOUTING
 // ======================================================================================================================
 void BasicSc2Bot::AttackWithZerglings() {
+	Point2D target = SeeEnemy();
+
 	auto zerglings = Observation()->GetUnits([&](const Unit &unit) {
 		return unit.unit_type == UNIT_TYPEID::ZERG_ZERGLING && unit.alliance == Unit::Alliance::Self;
 	});
 
 	// if enough zerglings
 	if (zerglings.size() >= 12) {
-		Point2D target = SeeEnemy();
 
 		// if no enemies in sight
 		if (target == Point2D(-1, -1)) {
@@ -604,7 +606,7 @@ Point2D BasicSc2Bot::SeeEnemy() {
 	// Look at all visable all Units
 	for (const auto &enemy : Observation()->GetUnits(Unit::Alliance::Enemy)) {
 		const auto &unit_info = Observation()->GetUnitTypeData().at(enemy->unit_type);
-		if (IsStructure(unit_info)) {
+		if (IsStructure(unit_info) && std::find(structures.begin(), structures.end(), enemy->pos) == structures.end()) {
 			// Add Structure to
 			structures.push_back(enemy->pos);
 		} else {
