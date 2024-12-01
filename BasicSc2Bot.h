@@ -56,6 +56,7 @@ private:
 
 
     void AssignExtractorWorkers();
+    void UnAssignExtractorWorkers();
     
     // data
     std::vector<Point2D> structures;
