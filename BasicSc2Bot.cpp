@@ -19,6 +19,7 @@ void BasicSc2Bot::OnGameStart() {
 	// find natural expansion locations
 	QueryInterface *query = Query();
 	expansion_locations = sc2::search::CalculateExpansionLocations(observation, query);
+	expansion_locations_seen = {Point2D(0, 0)};
 	
 	// return nullptr;
 	const Unit *scout_drone = FindAvailableDrone();
@@ -440,7 +441,7 @@ Point2D BasicSc2Bot::FindNaturalExpansionLocation(const Point2D &location, const
 
 	// If all expansion locations have been visited, clear list and start again
 	if (expansion_locations_seen.size() >= expansion_locations.size()) {
-		expansion_locations_seen.clear();
+		expansion_locations_seen = {Point2D(0, 0)};
 	}
 
 	Point3D min = Point3D(1000, 1000, 1000);
@@ -483,7 +484,7 @@ void BasicSc2Bot::AttackWithZerglings() {
 
 				// If at that natural location and no enemies, move to next target index
 				// otherwise target that location
-				if (Distance2D(zerglings.front()->pos, next_structure) < 3.0) {
+				if (Distance2D(zerglings.front()->pos, next_structure) < 7.0) {
 					expansion_locations_seen.push_back(next_structure);
 				} else {
 					target = next_structure;
