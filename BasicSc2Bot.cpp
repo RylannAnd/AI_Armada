@@ -147,7 +147,7 @@ void BasicSc2Bot::OnStep() {
 	}
 
 	// Check if we're floating on money
-	if (observation->GetMinerals() >= 400) {
+	if (observation->GetMinerals() >= 400 && CountUnitType(UNIT_TYPEID::ZERG_HATCHERY) == 2) {
 		TryBuildHatcheryInNatural();
 	}
 }
