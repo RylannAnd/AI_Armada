@@ -72,7 +72,6 @@ void BasicSc2Bot::OnStep() {
 	static bool create_extractor = true;
 	static bool expand = true;
 	static int num_zergling_upgrades = 0;
-	static int gas_workers = 0;
 
 	// Every extra drone spawned at setup phase will go through building core buildings
 	if (observation->GetFoodUsed() >= 17 && expand) {
@@ -101,11 +100,12 @@ void BasicSc2Bot::OnStep() {
 	}
 
 	// When Extractor is made
-	if (CountUnitType(UNIT_TYPEID::ZERG_EXTRACTOR) > 1 && gas_workers < 3) {
+	if (CountUnitType(UNIT_TYPEID::ZERG_EXTRACTOR) > 1 && num_zergling_upgrades == 0) {
 		// extractor workers
-		for (int i = 0; i < 3; i++) {
+		Units extractors = Observation()->GetUnits(Unit::Self, IsUnit(UNIT_TYPEID::ZERG_EXTRACTOR));
+		const Unit *extractor = extractors.front();
+		if (extractor->assigned_harvesters < 2) {		// only assign two workers
 			AssignExtractorWorkers();
-			gas_workers++;
 		}
 	}
 
@@ -243,11 +243,8 @@ bool BasicSc2Bot::TryBuildExtractor() {
 void BasicSc2Bot::AssignExtractorWorkers() {
 	Units extractors = Observation()->GetUnits(Unit::Self, IsUnit(UNIT_TYPEID::ZERG_EXTRACTOR));
 	const Unit *extractor = extractors[0];
-
-	if (extractor->assigned_harvesters < 3) {
-		const Unit *unit = FindAvailableDrone();
-		Actions()->UnitCommand(unit, ABILITY_ID::HARVEST_GATHER, extractor);
-	}
+	const Unit *unit = FindAvailableDrone();
+	Actions()->UnitCommand(unit, ABILITY_ID::HARVEST_GATHER, extractor);
 }
 
 bool BasicSc2Bot::TryBuildHatcheryInNatural() {
