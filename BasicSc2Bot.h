@@ -25,29 +25,46 @@ private:
 
     bool TryBuildDrone();
 
-    bool TryBuildUnit(AbilityID ability_type_for_unit, UnitTypeID unit_type);
-    
-
-    bool TryBuildStructure(AbilityID ability_type_for_structure, UnitTypeID unit_type);
-    bool GetRandomUnit(const Unit*& unit_out, const ObservationInterface* observation, UnitTypeID unit_type);
-
-
     bool TrySpawnOverlord();
-    bool TryBuildHatchery();
+    bool TryBuildHatcheryInNatural();
     bool TryBuildSpawningPool();
     bool TryBuildExtractor();
+    bool TryBuildQueen();
+    void TryInject();
+    Point2D FindNaturalExpansionLocation(const Point2D &main_hatchery_pos);
+
+
+    bool GetRandomUnit(const Unit*& unit_out, const ObservationInterface* observation, UnitTypeID unit_type);
+
+    bool TryBuildStructure(AbilityID ability_type_for_structure, UnitTypeID unit_type); 
+    bool TryBuildUnit(AbilityID ability_type_for_unit, UnitTypeID unit_type);
     void RetreatScouters();
 
     const Unit* FindNearestLarva();
     const Unit* FindAvailableDrone();
 
     int CountUnitType(UNIT_TYPEID unit_type);
-    Point2D FindEnemyBase();
+    
+    Point2D SeeEnemy();
+    void AttackWithZerglings();
+    double FindDamage (const UnitTypeData unit_data);
+    bool IsStructure (const UnitTypeData unit_data);
 
     bool TryBuildZergling();
-    void AttackWithZerglings(Point2D target);
 
     const Unit* FindNearestVespeneGeyser(const Point2D& start);
+
+
+    void AssignExtractorWorkers();
+    void UnAssignExtractorWorkers();
+    
+    // data
+    std::vector<Point2D> structures;
+    int structure_target = 0;
+    const Unit* FindNearestMineralField(const Point2D& start);
+    const Unit* FindNearestTownHall(const Point2D& start);
+    
+
 };
 
 
