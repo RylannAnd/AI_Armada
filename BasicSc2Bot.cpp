@@ -75,7 +75,8 @@ void BasicSc2Bot::OnStep() {
 	static bool spawn_pool = true;
 	static bool create_extractor = true;
 	static bool expand = true;
-	static int num_zergling_upgrades = 0;
+	static bool zerglings_upgraded = false;
+	static bool unassign_extractor_workers = true;
 
 	// Every extra drone spawned at setup phase will go through building core buildings
 	if (observation->GetFoodUsed() >= 17 && expand) {
@@ -109,39 +110,42 @@ void BasicSc2Bot::OnStep() {
 
 	if (CountUnitType(UNIT_TYPEID::ZERG_HATCHERY) > 1) { // execute attacks and upgrades after expanding
 
-		// morph lair
-		if (CountUnitType(UNIT_TYPEID::ZERG_LAIR) < 1) {
-			TryBuildUnit(ABILITY_ID::MORPH_LAIR, UNIT_TYPEID::ZERG_HATCHERY);
-		}
-
 		// Make Queens
 		if (CountUnitType(UNIT_TYPEID::ZERG_QUEEN) < 2 && observation->GetMinerals() >= 150) {
 			TryBuildQueen();
 		}
 
 		// extractor workers
-		if (CountUnitType(UNIT_TYPEID::ZERG_EXTRACTOR) > 0) {
+		if (CountUnitType(UNIT_TYPEID::ZERG_EXTRACTOR) > 0 && !zerglings_upgraded) {
 			AssignExtractorWorkers();
 		}
 
-		// Do Injections for extra larvae after lair is built
-		if (CountUnitType(UNIT_TYPEID::ZERG_QUEEN) > 0) {
-			TryInject();
-		}
-
 		// Upgrade zerling abilities
-		if (num_zergling_upgrades == 0) {
+		if (!zerglings_upgraded) {
 			std::vector<UpgradeID> completed_upgrades = observation->GetUpgrades();
 
 			if (std::find(completed_upgrades.begin(), completed_upgrades.end(), UPGRADE_ID::ZERGLINGMOVEMENTSPEED) != completed_upgrades.end()) {
-				num_zergling_upgrades++;
+				zerglings_upgraded = true;
 			} else {
 				TryBuildUnit(ABILITY_ID::RESEARCH_ZERGLINGMETABOLICBOOST, UNIT_TYPEID::ZERG_SPAWNINGPOOL);
 			}
-		} else if (num_zergling_upgrades == 1) {
-			TryBuildUnit(ABILITY_ID::RESEARCH_ZERGLINGADRENALGLANDS, UNIT_TYPEID::ZERG_SPAWNINGPOOL);
+		} 
+
+		if (zerglings_upgraded && unassign_extractor_workers){
+			Units extractors = Observation()->GetUnits(Unit::Self, IsUnit(UNIT_TYPEID::ZERG_EXTRACTOR));
+			const Unit *extractor = extractors[0];
+			if (extractor->assigned_harvesters >= 1){
+				UnAssignExtractorWorkers();	
+			}else{
+				unassign_extractor_workers = false;
+			}
 		}
 	}
+
+	// Do Injections for extra larvae
+	if (CountUnitType(UNIT_TYPEID::ZERG_QUEEN) > 0) {
+		TryInject();
+	}	
 }
 
 // CORE BUILDINGS / HARVESTING
@@ -239,6 +243,25 @@ void BasicSc2Bot::AssignExtractorWorkers() {
 	if (extractor->assigned_harvesters < 3) {
 		const Unit *unit = FindAvailableDrone();
 		Actions()->UnitCommand(unit, ABILITY_ID::HARVEST_GATHER, extractor);
+	}
+}
+
+void BasicSc2Bot::UnAssignExtractorWorkers() {
+    const ObservationInterface* observation = Observation();
+    Units drones = observation->GetUnits(Unit::Alliance::Self, IsUnit(UNIT_TYPEID::ZERG_DRONE));
+	Units hatchery = observation->GetUnits(Unit::Self, IsUnit(UNIT_TYPEID::ZERG_HATCHERY));
+
+    for (const auto& drone : drones) {
+        if (!drone->orders.empty()) {
+            const UnitOrder& current_order = drone->orders.front();
+			// Get the resource being gathered (minerals or gas)
+			const Unit* target = observation->GetUnit(current_order.target_unit_tag);
+			if (target && target->unit_type == UNIT_TYPEID::ZERG_EXTRACTOR) {
+								Actions()->UnitCommand(drone, ABILITY_ID::STOP);
+								Actions()->UnitCommand(drone, ABILITY_ID::MOVE_MOVE, hatchery[1]->pos);
+								Actions()->UnitCommand(drone, ABILITY_ID::HARVEST_GATHER, observation->GetUnits(Unit::Self, IsUnit(UNIT_TYPEID::ZERG_HATCHERY))[1]);
+			}
+        }
 	}
 }
 
@@ -501,10 +524,11 @@ void BasicSc2Bot::TryInject() {
                 // Iterate through Queens to find one that can inject
                 for (const auto &queen : observation->GetUnits(Unit::Alliance::Self)) {
                     if (queen->unit_type == UNIT_TYPEID::ZERG_QUEEN &&
-                        queen->energy >= 25) { // Queens need at least 25 energy to inject
+                        queen->energy >= 25 && 
+						queen->orders.empty()) { // Queens need at least 25 energy to inject
                         // Command the Queen to inject the Hatchery
                         Actions()->UnitCommand(queen, ABILITY_ID::EFFECT_INJECTLARVA, hatchery);
-                        break; // Move to the next Hatchery after assigning a Queen
+                        // break; // Move to the next Hatchery after assigning a Queen
                     }
                 }
             }
