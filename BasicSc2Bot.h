@@ -31,7 +31,7 @@ private:
     bool TryBuildExtractor();
     bool TryBuildQueen();
     void TryInject();
-    Point2D FindNaturalExpansionLocation(const Point2D &main_hatchery_pos);
+    Point2D FindNaturalExpansionLocation(const Point2D &main_hatchery_pos, const bool not_seen);
 
 
     bool GetRandomUnit(const Unit*& unit_out, const ObservationInterface* observation, UnitTypeID unit_type);
@@ -62,6 +62,8 @@ private:
     int structure_target = 0;
     const Unit* FindNearestMineralField(const Point2D& start);
     const Unit* FindNearestTownHall(const Point2D& start);
+    std::vector<Point3D> expansion_locations;
+    std::vector<Point2D> expansion_locations_seen;
     
 
 };

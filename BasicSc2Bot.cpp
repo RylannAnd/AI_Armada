@@ -16,6 +16,10 @@ void BasicSc2Bot::OnGameStart() {
 	const ObservationInterface *observation = Observation();
 	possible_enemy_locations = observation->GetGameInfo().enemy_start_locations;
 
+	// find natural expansion locations
+	QueryInterface *query = Query();
+	expansion_locations = sc2::search::CalculateExpansionLocations(observation, query);
+	
 	// return nullptr;
 	const Unit *scout_drone = FindAvailableDrone();
 	if (scout_drone && !possible_enemy_locations.empty()) {
@@ -246,7 +250,7 @@ bool BasicSc2Bot::TryBuildHatcheryInNatural() {
 	}
 
 	Point2D my_base = observation->GetStartLocation();
-	Point2D natural_expansion_pos = FindNaturalExpansionLocation(my_base);
+	Point2D natural_expansion_pos = FindNaturalExpansionLocation(my_base, false);
 
 	// get  available drone to build the hatchery
 	const Unit *builder_drone = FindAvailableDrone();
@@ -408,15 +412,20 @@ const Unit *BasicSc2Bot::FindNearestVespeneGeyser(const Point2D &start) {
 	return nearest_geyser;
 }
 
-Point2D BasicSc2Bot::FindNaturalExpansionLocation(const Point2D &main_hatchery_pos) {
-	QueryInterface *query = Query();
+Point2D BasicSc2Bot::FindNaturalExpansionLocation(const Point2D &location, const bool not_seen) {
 	const ObservationInterface *observation = Observation();
-	std::vector<Point3D> expansion_locations = sc2::search::CalculateExpansionLocations(observation, query);
-	Point3D my_base = observation->GetStartLocation();
+
+	// If all expansion locations have been visited, clear list and start again
+	if (expansion_locations_seen.size() >= expansion_locations.size()) {
+		expansion_locations_seen.clear();
+	}
+
 	Point3D min = Point3D(1000, 1000, 1000);
 	for (auto it : expansion_locations) {
-		if (abs(my_base.x - it.x) + abs(my_base.y - it.y) < abs(my_base.x - min.x) + abs(my_base.y - min.y)) {
-			min = it;
+		if (abs(location.x - it.x) + abs(location.y - it.y) < abs(location.x - min.x) + abs(location.y - min.y)) {
+			if (!not_seen || std::find(expansion_locations_seen.begin(), expansion_locations_seen.end(), it) == expansion_locations_seen.end()){
+				min = it;
+			}
 		}
 	}
 	return min;
@@ -435,7 +444,7 @@ void BasicSc2Bot::AttackWithZerglings() {
 
 		// if no enemies in sight
 		if (target == Point2D(-1, -1)) {
-			// If enemy structures have been found
+			// If enemy structures have been found, else go to next natural resource location
 			if (structure_target < structures.size()) {
 				Point2D next_structure = structures[structure_target];
 
@@ -443,6 +452,16 @@ void BasicSc2Bot::AttackWithZerglings() {
 				// otherwise target that structure
 				if (Distance2D(zerglings.front()->pos, next_structure) < 1.0) {
 					++structure_target;
+				} else {
+					target = next_structure;
+				}
+			} else {
+				Point2D next_structure = FindNaturalExpansionLocation(zerglings.front()->pos, true);
+
+				// If at that natural location and no enemies, move to next target index
+				// otherwise target that location
+				if (Distance2D(zerglings.front()->pos, next_structure) < 3.0) {
+					expansion_locations_seen.push_back(next_structure);
 				} else {
 					target = next_structure;
 				}
