@@ -116,11 +116,6 @@ void BasicSc2Bot::OnStep() {
 			AssignExtractorWorkers();
 		}
 
-		// Do Injections for extra larvae
-		if (CountUnitType(UNIT_TYPEID::ZERG_QUEEN) > 0) {
-			TryInject();
-		}	
-
 		// Upgrade zerling abilities
 		if (!zerglings_upgraded) {
 			std::vector<UpgradeID> completed_upgrades = observation->GetUpgrades();
@@ -142,6 +137,11 @@ void BasicSc2Bot::OnStep() {
 			}
 		}
 	}
+
+	// Do Injections for extra larvae
+	if (CountUnitType(UNIT_TYPEID::ZERG_QUEEN) > 0) {
+		TryInject();
+	}	
 }
 
 // CORE BUILDINGS / HARVESTING
