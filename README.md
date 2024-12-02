@@ -1,4 +1,15 @@
-# BasicSc2Bot
+# AIArmadaBot
+Team Name: AI Armada
+Star Craft 2 Bot for CMPUT 350 at Ualberta
+This Bot is based on the [BasicSc2Bot](https://github.com/tuero/BasicSc2Bot) template
+
+# Group Members
+Johnson Trinh
+Charles Aina
+Advi Islam
+Rylann Andrews
+
+# README For BasicSc2Bot Below
 Template SC2 Bot for CMPUT 350 at UAlberta.
 
 This bot works with our fork of [Sc2LadderServer](https://github.com/solinas/Sc2LadderServer) which will be used to run the tournament at the end of the term. It should help you
@@ -15,8 +26,8 @@ set up the build process with the correct version of SC2 API so you can focus on
 Download and install [Visual Studio 2022](https://www.visualstudio.com/downloads/) if you need it.
 
 ```bat
-:: Clone the project
-$ git clone --recursive https://github.com/tuero/BasicSc2Bot.git
+:: Clone the project (AIArmadaBot)
+$ git clone --recursive https://github.com/RylannAnd/AI_Armada
 $ cd BasicSc2Bot
 
 :: Create build directory.
@@ -39,8 +50,8 @@ Note: Try opening the SC2 game client before installing. If the game crashes bef
 
 To build, you must use the version of clang that comes with MacOS. 
 ```bat
-:: Clone the project
-$ git clone --recursive https://github.com/tuero/BasicSc2Bot.git
+:: Clone the project (AIArmadaBot)
+$ git clone --recursive https://github.com/RylannAnd/AI_Armada
 $ cd BasicSc2Bot
 
 :: Create build directory.
