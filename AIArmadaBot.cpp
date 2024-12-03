@@ -20,7 +20,7 @@ void AIArmadaBot::OnGameStart() {
 	start_location = observation->GetStartLocation();
 	possible_enemy_locations = observation->GetGameInfo().enemy_start_locations;
 	expansion_locations = sc2::search::CalculateExpansionLocations(observation, query);
-	expansion_locations_seen = {Point2D(0, 0)};
+	expansion_locations_seen = {};
 
 	// Start Scouting
 	const Unit *scout_drone = FindAvailableDrone();
@@ -149,7 +149,7 @@ void AIArmadaBot::OnStep() {
 	}
 
 	// If floating on resources then build extra hatchery
-	if(observation->GetMinerals() >= 400) {
+	if (observation->GetMinerals() >= 400) {
 		TryBuildHatcheryInNatural();
 	}
 }
@@ -203,21 +203,38 @@ bool AIArmadaBot::TryBuildHatcheryInNatural() {
 		return false;
 	}
 
-	Point2D natural_expansion_pos = FindNaturalExpansionLocation(start_location, false);
-
-	// get  available drone to build the hatchery
+	// Get an available drone to build the hatchery
 	const Unit *builder_drone = FindAvailableDrone();
 	if (!builder_drone) {
+		std::cout << "No available drone to build hatchery." << std::endl;
 		return false;
 	}
 
-	// verify that the location is buildable
-	if (query->Placement(ABILITY_ID::BUILD_HATCHERY, natural_expansion_pos, builder_drone)) {
-		action->UnitCommand(builder_drone, ABILITY_ID::BUILD_HATCHERY, natural_expansion_pos);
-		return true;
+	Point2D best_location;
+	float min_distance = std::numeric_limits<float>::max();
+	bool location_found = false;
+
+	// Iterate through all expansion locations
+	for (const auto &expansion : expansion_locations) {
+		// Check if the location is buildable
+		if (query->Placement(ABILITY_ID::BUILD_HATCHERY, expansion, builder_drone)) {
+			float distance = Distance2D(start_location, expansion);
+
+			if (distance < min_distance) {
+				min_distance = distance;
+				best_location = expansion;
+				location_found = true;
+			}
+		}
 	}
 
-	return false; // unable to find a suitable location
+	if (!location_found) {
+		return false;
+	}
+
+	// Command the drone to build at the best location
+	action->UnitCommand(builder_drone, ABILITY_ID::BUILD_HATCHERY, best_location);
+	return true;
 }
 // =================================================================================================
 
@@ -424,15 +441,15 @@ const Unit *AIArmadaBot::FindNearestVespeneGeyser(const Point2D &start) {
 }
 
 Point2D AIArmadaBot::FindNaturalExpansionLocation(const Point2D &location, bool not_seen) {
-	// If all expansion locations have been visited, clear list and start again
+	// If all expansion locations have been visited, clear the list
 	if (expansion_locations_seen.size() >= expansion_locations.size()) {
-		expansion_locations_seen = {Point2D(0, 0)};
+		expansion_locations_seen.clear();
 	}
 
 	Point3D min = Point3D(1000, 1000, 1000);
 	for (auto it : expansion_locations) {
 		if (abs(location.x - it.x) + abs(location.y - it.y) < abs(location.x - min.x) + abs(location.y - min.y)) {
-			if (Point2D(it) != Point2D(0, 0) && (!not_seen || std::find(expansion_locations_seen.begin(), expansion_locations_seen.end(), it) == expansion_locations_seen.end())) {
+			if ((!not_seen || std::find(expansion_locations_seen.begin(), expansion_locations_seen.end(), it) == expansion_locations_seen.end())) {
 				min = it;
 			}
 		}
@@ -535,12 +552,10 @@ void AIArmadaBot::TryInject() {
 			if (!alreadyInjected) {
 				// Iterate through Queens to find one that can inject
 				for (const auto &queen : observation->GetUnits(Unit::Alliance::Self)) {
-					if (queen->unit_type == UNIT_TYPEID::ZERG_QUEEN &&
-						queen->energy >= 25 &&
-						queen->orders.empty()) { // Queens need at least 25 energy to inject
+					if (queen->unit_type == UNIT_TYPEID::ZERG_QUEEN && queen->energy >= 25 && queen->orders.empty()) { // Queens need at least 25 energy to inject
 						// Command the Queen to inject the Hatchery
 						action->UnitCommand(queen, ABILITY_ID::EFFECT_INJECTLARVA, hatchery);
-						// break; // Move to the next Hatchery after assigning a Queen
+						break; // Move to the next Hatchery after assigning a Queen
 					}
 				}
 			}
