@@ -526,6 +526,14 @@ void AIArmadaBot::AttackWithZerglings() {
 				}
 			}
 		}
+	} else { // Not enough zerglings, meet at base
+		for (auto &zergling : zerglings) {
+				// Check if the Zergling is already moving to the target
+				if (zergling->orders.empty() || zergling->orders.front().ability_id != ABILITY_ID::ATTACK) {
+					// Issue the attack command to the target
+					action->UnitCommand(zergling, ABILITY_ID::MOVE_MOVE, start_location);
+				}
+			}
 	}
 }
 // =================================================================================================
@@ -565,10 +573,12 @@ void AIArmadaBot::TryInject() {
 void AIArmadaBot::AssignExtractorWorkers() {
 	Units extractors = observation->GetUnits(Unit::Self, IsUnit(UNIT_TYPEID::ZERG_EXTRACTOR));
 	const Unit *extractor = extractors[0];
+	static int assigned = 0;
 
-	if (extractor->assigned_harvesters < 3) {
+	if (assigned < 3) {
 		const Unit *unit = FindAvailableDrone();
 		action->UnitCommand(unit, ABILITY_ID::HARVEST_GATHER, extractor);
+		++assigned;
 	}
 }
 
