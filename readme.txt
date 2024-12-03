@@ -1,0 +1,92 @@
+Team: AI Armada
+Group Members:
+* Johnson Trinh
+* Charles Aina
+* Advi Islam
+* Rylann Andrews
+
+Star Craft 2 Bot for CMPUT 350 at Ualberta. Our bot is based on the [BasicSc2Bot](https://github.com/tuero/BasicSc2Bot) template.
+
+# Instructions on how to obtain, compile, and run AIArmadaBot
+
+System Requirnments:
+* [CMake](https://cmake.org/download/)
+* Starcraft 2 ([Windows](https://starcraft2.com/en-us/)) ([Linux](https://github.com/Blizzard/s2client-proto#linux-packages)) 
+* [Starcraft 2 Map Packs](https://github.com/Blizzard/s2client-proto#map-packs), The maps we will be using are in the `Ladder 2017 Season 1` pack. Read the instructions for how to extract and where to place the maps.
+* For Windows: [Visual Studio 2022](https://www.visualstudio.com/downloads/)
+
+How to obtain/compile the bot:
+## Windows
+```bat
+:: Clone the project (AIArmadaBot)
+$ git clone --recursive https://github.com/RylannAnd/AI_Armada
+$ cd AI_Armada
+
+:: Create build directory.
+$ mkdir build
+$ cd build
+
+:: Generate VS solution.
+$ cmake ../ -G "Visual Studio 17 2022"
+
+:: Build the project using Visual Studio.
+$ start AIArmadaBot.sln
+```
+
+## Mac
+Note: Try opening the SC2 game client before installing. If the game crashes before opening, you may need to change your Share name:
+* Open `System Preferences`
+* Click on `Sharing`
+* In the `Computer Name` textfield, change the default 'Macbook Pro' to a single word name (the exact name shouldn't matter, as long as its not the default name)
+
+To build, you must use the version of clang that comes with MacOS. 
+```bat
+:: Clone the project (AIArmadaBot)
+$ git clone --recursive https://github.com/RylannAnd/AI_Armada
+$ cd AI_Armada
+
+:: Create build directory.
+$ mkdir build
+$ cd build
+
+:: Set Apple Clang as the default compiler
+export CC=/usr/bin/clang
+export CXX=/usr/bin/clang++
+
+:: Generate a Makefile
+:: Use 'cmake -DCMAKE_BUILD_TYPE=Debug ../' if debug info is needed
+$ cmake -DCMAKE_BUILD_TYPE=Release ../
+
+:: Build
+$ make
+```
+
+## Linux
+The Linux version is headless, meaning that you will not be able to see your bot 
+First, download the [Linux package](https://github.com/Blizzard/s2client-proto#linux-packages).
+Unzip it to your home directory. 
+The directory should read as `/home/<USER>/StarCraftII/`.
+
+Rename the `Maps` directory to lowercase, and place any downloaded maps inside this directory:
+```bash
+$ mv /home/<USER>/StarCraftII/Maps /home/<USER>/StarCraftII/maps
+```
+
+Finally, create a directory (note the added space) which contains a file `ExecuteInfo.txt`, which lists the executable directory:
+```bash
+$ mkdir "/home/<USER>/StarCraft II"
+$ echo "executable = /home/<USER>/StarCraftII/Versions/Base75689/SC2_x64" > "/home/<USER>/StarCraft II/ExecuteInfo.txt"
+```
+The `Base75689` will need to match the correct version which matches the version you downloaded. To check, navigate to `/home/<USER>/StarCraftII/Versions/`.
+
+Remember to replace `<USER>` with the name of your user profile.
+
+How to run the bot against the built-in AI:
+You can find the build target under the `bin` directory. Can be run like the following example:
+```
+# Windows
+./AIArmadaBot.exe -c -a zerg -d Hard -m CactusValleyLE.SC2Map
+
+# Mac
+./AIArmadaBot -c -a zerg -d Hard -m CactusValleyLE.SC2Map
+```
