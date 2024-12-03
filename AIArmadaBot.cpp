@@ -13,22 +13,6 @@ using namespace sc2;
 
 // ./BasicSc2Bot.exe -c -a zerg -d Hard -m CactusValleyLE.SC2Map
 void AIArmadaBot::OnGameStart() {
-	// Initilize Values
-	observation = Observation();
-	query = Query();
-	action = Actions();
-	start_location = observation->GetStartLocation();
-	possible_enemy_locations = observation->GetGameInfo().enemy_start_locations;
-	expansion_locations = sc2::search::CalculateExpansionLocations(observation, query);
-	expansion_locations_seen = {Point2D(0, 0)};
-
-	// Start Scouting
-	const Unit *scout_drone = FindAvailableDrone();
-	if (scout_drone && !possible_enemy_locations.empty()) {
-		action->UnitCommand(scout_drone, ABILITY_ID::MOVE_MOVE, possible_enemy_locations[0]);
-		current_scout_index = 1; // Prepare for next location
-	}
-
 	return;
 }
 
@@ -36,7 +20,10 @@ void AIArmadaBot::OnUnitIdle(const Unit *unit) {
 	// If it's a drone that was scouting
 	if (unit->unit_type == UNIT_TYPEID::ZERG_DRONE) {
 		// Check if we have more locations to scout
-		if (structures.empty() && current_scout_index < possible_enemy_locations.size()) {
+		if (structures.empty()) {
+			if (current_scout_index >= possible_enemy_locations.size()) {
+				current_scout_index = 0;
+			}
 			action->UnitCommand(unit, ABILITY_ID::MOVE_MOVE, possible_enemy_locations[current_scout_index]);
 			current_scout_index++;
 		} else {
@@ -58,12 +45,43 @@ void AIArmadaBot::OnUnitIdle(const Unit *unit) {
 }
 
 void AIArmadaBot::OnStep() {
+	static int step_counter = 0;
+	++step_counter;
+	// Wait for 10 frames
+	if (step_counter < 10) {
+		return;
+	}
+
+	// Initilize Values
+	static int initilized = 0;
+	if (initilized <= 0) {
+		observation = Observation();
+		query = Query();
+		action = Actions();
+
+		++initilized;
+		return;
+	} else if (initilized <= 1) {
+		start_location = observation->GetStartLocation();
+		possible_enemy_locations = observation->GetGameInfo().enemy_start_locations;
+		expansion_locations = sc2::search::CalculateExpansionLocations(observation, query);
+		expansion_locations_seen = {Point2D(0, 0)};
+
+		// Start Scouting
+		const Unit *scout_drone = FindAvailableDrone();
+		if (scout_drone && !possible_enemy_locations.empty()) {
+			action->UnitCommand(scout_drone, ABILITY_ID::MOVE_MOVE, possible_enemy_locations[0]);
+			current_scout_index = 1; // Prepare for next location
+		}
+			initilized = true;
+		
+		++initilized;
+		return;
+	}
+
 	// Spawn overlords as needed
-	static int overlord_count = 0;
-	int required_overlords = (observation->GetFoodUsed() + 8) / 8;
-	if ((observation->GetFoodUsed() >= 13 && overlord_count == 0 && observation->GetMinerals() >= 100) || (overlord_count > 0 && overlord_count < required_overlords)) {
+	if (observation->GetFoodCap() <= observation->GetFoodUsed() + 8) {
 		TrySpawnOverlord();
-		overlord_count++;
 	}
 
 	// Spawn drones as neeeded with initial cap being 20
@@ -426,8 +444,9 @@ Point2D AIArmadaBot::FindNaturalExpansionLocation(const Point2D &location, bool 
 
 	Point3D min = Point3D(1000, 1000, 1000);
 	for (auto it : expansion_locations) {
+		std::cout << it.x << ", " << it.y << std::endl;
 		if (abs(location.x - it.x) + abs(location.y - it.y) < abs(location.x - min.x) + abs(location.y - min.y)) {
-			if (Point2D(it) != Point2D(0, 0) && (!not_seen || std::find(expansion_locations_seen.begin(), expansion_locations_seen.end(), it) == expansion_locations_seen.end())){
+			if ((it.x != 0 || it.y != 0) && (!not_seen || std::find(expansion_locations_seen.begin(), expansion_locations_seen.end(), it) == expansion_locations_seen.end())){
 				min = it;
 			}
 		}
@@ -535,7 +554,7 @@ void AIArmadaBot::TryInject() {
 						queen->orders.empty()) { // Queens need at least 25 energy to inject
                         // Command the Queen to inject the Hatchery
                         action->UnitCommand(queen, ABILITY_ID::EFFECT_INJECTLARVA, hatchery);
-                        // break; // Move to the next Hatchery after assigning a Queen
+                        break; // Move to the next Hatchery after assigning a Queen
                     }
                 }
             }
