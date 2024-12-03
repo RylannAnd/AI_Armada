@@ -122,32 +122,36 @@ void AIArmadaBot::OnStep() {
 		}
 	}
 
-		// Upgrade zerling abilities
-		if (!zerglings_upgraded) {
-			std::vector<UpgradeID> completed_upgrades = observation->GetUpgrades();
+	// Upgrade zerling abilities
+	if (!zerglings_upgraded) {
+		std::vector<UpgradeID> completed_upgrades = observation->GetUpgrades();
 
-			if (std::find(completed_upgrades.begin(), completed_upgrades.end(), UPGRADE_ID::ZERGLINGMOVEMENTSPEED) != completed_upgrades.end()) {
-				zerglings_upgraded = true;
-			} else {
-				TryBuildUnit(ABILITY_ID::RESEARCH_ZERGLINGMETABOLICBOOST, UNIT_TYPEID::ZERG_SPAWNINGPOOL);
-			}
-		} 
+		if (std::find(completed_upgrades.begin(), completed_upgrades.end(), UPGRADE_ID::ZERGLINGMOVEMENTSPEED) != completed_upgrades.end()) {
+			zerglings_upgraded = true;
+		} else {
+			TryBuildUnit(ABILITY_ID::RESEARCH_ZERGLINGMETABOLICBOOST, UNIT_TYPEID::ZERG_SPAWNINGPOOL);
+		}
+	}
 
-		if (zerglings_upgraded && unassign_extractor_workers){
-			Units extractors = observation->GetUnits(Unit::Self, IsUnit(UNIT_TYPEID::ZERG_EXTRACTOR));
-			const Unit *extractor = extractors[0];
-			if (extractor->assigned_harvesters >= 1){
-				UnAssignExtractorWorkers();	
-			}else{
-				unassign_extractor_workers = false;
-			}
+	if (zerglings_upgraded && unassign_extractor_workers) {
+		Units extractors = observation->GetUnits(Unit::Self, IsUnit(UNIT_TYPEID::ZERG_EXTRACTOR));
+		const Unit *extractor = extractors[0];
+		if (extractor->assigned_harvesters >= 1) {
+			UnAssignExtractorWorkers();
+		} else {
+			unassign_extractor_workers = false;
 		}
 	}
 
 	// Do Injections for extra larvae
 	if (CountUnitType(UNIT_TYPEID::ZERG_QUEEN) > 0) {
 		TryInject();
-	}	
+	}
+
+	// If floating on resources then build extra hatchery
+	if(observation->GetMinerals() >= 400) {
+		TryBuildHatcheryInNatural();
+	}
 }
 
 // BUILD CORE BUILDINGS
@@ -177,7 +181,7 @@ bool AIArmadaBot::TryBuildSpawningPool() {
 		if (builder_drone) {
 			// Define a list of potential nearby build locations
 			std::vector<Point2D> build_locations = {
-				start_location + Point2D(5, 5),  // Bottom Right
+				start_location + Point2D(5, 5),	 // Bottom Right
 				start_location + Point2D(-5, 5), // Bottom Left
 				start_location + Point2D(5, -5), // Top Right
 				start_location + Point2D(-5, -5) // Top Left
@@ -428,7 +432,7 @@ Point2D AIArmadaBot::FindNaturalExpansionLocation(const Point2D &location, bool 
 	Point3D min = Point3D(1000, 1000, 1000);
 	for (auto it : expansion_locations) {
 		if (abs(location.x - it.x) + abs(location.y - it.y) < abs(location.x - min.x) + abs(location.y - min.y)) {
-			if (Point2D(it) != Point2D(0, 0) && (!not_seen || std::find(expansion_locations_seen.begin(), expansion_locations_seen.end(), it) == expansion_locations_seen.end())){
+			if (Point2D(it) != Point2D(0, 0) && (!not_seen || std::find(expansion_locations_seen.begin(), expansion_locations_seen.end(), it) == expansion_locations_seen.end())) {
 				min = it;
 			}
 		}
@@ -515,33 +519,33 @@ void AIArmadaBot::AttackWithZerglings() {
 // UNIT ACTIONS
 // =================================================================================================
 void AIArmadaBot::TryInject() {
-    // Iterate through all Hatcheries
-    for (const auto &hatchery : observation->GetUnits(Unit::Alliance::Self)) {
-        if (hatchery->unit_type == UNIT_TYPEID::ZERG_HATCHERY) {
+	// Iterate through all Hatcheries
+	for (const auto &hatchery : observation->GetUnits(Unit::Alliance::Self)) {
+		if (hatchery->unit_type == UNIT_TYPEID::ZERG_HATCHERY) {
 
-            // Check if the Hatchery is eligible for an injection
-            bool alreadyInjected = false;
-            for (const auto &order : hatchery->orders) {
-                if (order.ability_id == ABILITY_ID::EFFECT_INJECTLARVA) {
-                    alreadyInjected = true;
-                    break;
-                }
-            }
+			// Check if the Hatchery is eligible for an injection
+			bool alreadyInjected = false;
+			for (const auto &order : hatchery->orders) {
+				if (order.ability_id == ABILITY_ID::EFFECT_INJECTLARVA) {
+					alreadyInjected = true;
+					break;
+				}
+			}
 
-            if (!alreadyInjected) {
-                // Iterate through Queens to find one that can inject
-                for (const auto &queen : observation->GetUnits(Unit::Alliance::Self)) {
-                    if (queen->unit_type == UNIT_TYPEID::ZERG_QUEEN &&
-                        queen->energy >= 25 && 
+			if (!alreadyInjected) {
+				// Iterate through Queens to find one that can inject
+				for (const auto &queen : observation->GetUnits(Unit::Alliance::Self)) {
+					if (queen->unit_type == UNIT_TYPEID::ZERG_QUEEN &&
+						queen->energy >= 25 &&
 						queen->orders.empty()) { // Queens need at least 25 energy to inject
-                        // Command the Queen to inject the Hatchery
-                        action->UnitCommand(queen, ABILITY_ID::EFFECT_INJECTLARVA, hatchery);
-                        // break; // Move to the next Hatchery after assigning a Queen
-                    }
-                }
-            }
-        }
-    }
+						// Command the Queen to inject the Hatchery
+						action->UnitCommand(queen, ABILITY_ID::EFFECT_INJECTLARVA, hatchery);
+						// break; // Move to the next Hatchery after assigning a Queen
+					}
+				}
+			}
+		}
+	}
 }
 
 void AIArmadaBot::AssignExtractorWorkers() {
@@ -555,20 +559,20 @@ void AIArmadaBot::AssignExtractorWorkers() {
 }
 
 void AIArmadaBot::UnAssignExtractorWorkers() {
-    Units drones = observation->GetUnits(Unit::Alliance::Self, IsUnit(UNIT_TYPEID::ZERG_DRONE));
+	Units drones = observation->GetUnits(Unit::Alliance::Self, IsUnit(UNIT_TYPEID::ZERG_DRONE));
 	Units hatchery = observation->GetUnits(Unit::Self, IsUnit(UNIT_TYPEID::ZERG_HATCHERY));
 
-    for (const auto& drone : drones) {
-        if (!drone->orders.empty()) {
-            const UnitOrder& current_order = drone->orders.front();
+	for (const auto &drone : drones) {
+		if (!drone->orders.empty()) {
+			const UnitOrder &current_order = drone->orders.front();
 			// Get the resource being gathered (minerals or gas)
-			const Unit* target = observation->GetUnit(current_order.target_unit_tag);
+			const Unit *target = observation->GetUnit(current_order.target_unit_tag);
 			if (target && target->unit_type == UNIT_TYPEID::ZERG_EXTRACTOR) {
-								action->UnitCommand(drone, ABILITY_ID::STOP);
-								action->UnitCommand(drone, ABILITY_ID::MOVE_MOVE, hatchery[1]->pos);
-								action->UnitCommand(drone, ABILITY_ID::HARVEST_GATHER, observation->GetUnits(Unit::Self, IsUnit(UNIT_TYPEID::ZERG_HATCHERY))[1]);
+				action->UnitCommand(drone, ABILITY_ID::STOP);
+				action->UnitCommand(drone, ABILITY_ID::MOVE_MOVE, hatchery[1]->pos);
+				action->UnitCommand(drone, ABILITY_ID::HARVEST_GATHER, observation->GetUnits(Unit::Self, IsUnit(UNIT_TYPEID::ZERG_HATCHERY))[1]);
 			}
-        }
+		}
 	}
 }
 // =================================================================================================
