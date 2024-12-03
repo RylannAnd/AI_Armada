@@ -444,7 +444,6 @@ Point2D AIArmadaBot::FindNaturalExpansionLocation(const Point2D &location, bool 
 
 	Point3D min = Point3D(1000, 1000, 1000);
 	for (auto it : expansion_locations) {
-		std::cout << it.x << ", " << it.y << std::endl;
 		if (abs(location.x - it.x) + abs(location.y - it.y) < abs(location.x - min.x) + abs(location.y - min.y)) {
 			if ((it.x != 0 || it.y != 0) && (!not_seen || std::find(expansion_locations_seen.begin(), expansion_locations_seen.end(), it) == expansion_locations_seen.end())){
 				min = it;
