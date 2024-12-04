@@ -463,8 +463,6 @@ Point2D AIArmadaBot::SeeEnemy() {
 	Point2D best_target = Point2D(-1, -1);
 	double most_damage = -INFINITY;
 
-	std::cout << structures.size() << std::endl;
-
 	// Remove destroyed units
 	structures.erase(
     std::remove_if(structures.begin(), structures.end(), [&](const Point2D &pos) {
