@@ -343,9 +343,10 @@ const Unit *AIArmadaBot::FindAvailableDrone() {
 const Unit *AIArmadaBot::FindNearestMineralField(const Point2D &start) {
 	const Unit *nearest_mineral = nullptr;
 	float min_distance = std::numeric_limits<float>::max();
+	IsMineralPatch is_mineral_patch;
 
 	for (const auto &unit : observation->GetUnits()) {
-		if (unit->unit_type == UNIT_TYPEID::NEUTRAL_MINERALFIELD) {
+		if (is_mineral_patch(unit->unit_type)) {
 			float distance = DistanceSquared2D(unit->pos, start);
 			if (distance < min_distance) {
 				min_distance = distance;
@@ -423,9 +424,10 @@ bool AIArmadaBot::IsStructure(const UnitTypeData unit_data) {
 const Unit *AIArmadaBot::FindNearestVespeneGeyser(const Point2D &start) {
 	const Unit *nearest_geyser = nullptr;
 	float min_distance = std::numeric_limits<float>::max();
+	IsGeyser is_geyser;
 
 	for (const auto &unit : observation->GetUnits()) {
-		if (unit->unit_type == UNIT_TYPEID::NEUTRAL_VESPENEGEYSER) {
+		if (is_geyser(unit->unit_type)) {
 			float distance = DistanceSquared2D(unit->pos, start);
 			if (distance < min_distance) {
 				min_distance = distance;
