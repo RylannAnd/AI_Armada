@@ -463,13 +463,24 @@ Point2D AIArmadaBot::SeeEnemy() {
 	Point2D best_target = Point2D(-1, -1);
 	double most_damage = -INFINITY;
 
+	// Remove destroyed units
+	structures.erase(
+    std::remove_if(structures.begin(), structures.end(), [&](const Point2D &pos) {
+        // Check if any enemy unit is near this position
+        auto enemies = observation->GetUnits(Unit::Alliance::Enemy);
+        return std::none_of(enemies.begin(), enemies.end(), [&](const auto &enemy) {
+            return Distance2D(enemy->pos, pos) < 1.0;
+        });
+    }),
+    structures.end());
+
 	// Look at all visable all Units
 	for (const auto &enemy : observation->GetUnits(Unit::Alliance::Enemy)) {
 		const auto &unit_info = observation->GetUnitTypeData().at(enemy->unit_type);
 		if (IsStructure(unit_info) && std::find(structures.begin(), structures.end(), enemy->pos) == structures.end()) {
 			// Add Structure to
 			structures.push_back(enemy->pos);
-		} else {
+		} else if (!(enemy->is_flying)) {
 			// Check for military unit or worker with most damage
 			double unit_damage = FindDamage(unit_info);
 			if (unit_damage > most_damage) {
@@ -493,18 +504,8 @@ void AIArmadaBot::AttackWithZerglings() {
 	if (zerglings.size() >= 14) {
 		// if no enemies in sight
 		if (target == Point2D(-1, -1)) {
-			// If enemy structures have been found, else go to next natural resource location
-			if (structure_target < structures.size()) {
-				Point2D next_structure = structures[structure_target];
-
-				// If at that structure and no structure is there, move to next target index
-				// otherwise target that structure
-				if (Distance2D(zerglings.front()->pos, next_structure) < 1.0) {
-					++structure_target;
-				} else {
-					target = next_structure;
-				}
-			} else {
+			if (structures.empty()) {
+				// If enemy structures are gone, go to next natural resource location
 				Point2D next_structure = FindNaturalExpansionLocation(zerglings.front()->pos, true);
 
 				// If at that natural location and no enemies, move to next target index
@@ -514,6 +515,8 @@ void AIArmadaBot::AttackWithZerglings() {
 				} else {
 					target = next_structure;
 				}
+			} else {
+				target = structures[0];
 			}
 		}
 
