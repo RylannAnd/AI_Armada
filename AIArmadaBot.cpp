@@ -488,7 +488,7 @@ void AIArmadaBot::AttackWithZerglings() {
 	});
 
 	// if enough zerglings
-	if (zerglings.size() >= 12) {
+	if (zerglings.size() >= 14) {
 		// if no enemies in sight
 		if (target == Point2D(-1, -1)) {
 			// If enemy structures have been found, else go to next natural resource location
